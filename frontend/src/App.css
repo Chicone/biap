@@ -1,0 +1,263 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f5f7fb;
+  color: #172033;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+}
+
+.sidebar {
+  width: 280px;
+  background: #0f172a;
+  color: white;
+  padding: 28px 22px;
+}
+
+.brand {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 42px;
+}
+
+.brand-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #38bdf8;
+  color: #0f172a;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 22px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.brand p {
+  margin: 2px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #cbd5e1;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+nav a.active,
+nav a:hover {
+  background: #1e293b;
+  color: white;
+}
+
+.main {
+  flex: 1;
+  padding: 32px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.topbar h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.topbar p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+button {
+  border: none;
+  background: #2563eb;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+}
+
+.card span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.card strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 32px;
+}
+
+.panel {
+  background: white;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+}
+
+.panel-header h3 {
+  margin: 0;
+}
+
+.panel-header p {
+  margin: 6px 0 20px;
+  color: #64748b;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  color: #64748b;
+  font-size: 13px;
+  padding-bottom: 12px;
+}
+
+td {
+  padding: 16px 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.running {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.ready {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.api-status {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+
+.modal {
+  width: 520px;
+  background: white;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.experiment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.experiment-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.experiment-form input,
+.experiment-form select,
+.experiment-form textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+}
+
+.experiment-form textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.secondary-button {
+  background: #e2e8f0;
+  color: #334155;
+}
