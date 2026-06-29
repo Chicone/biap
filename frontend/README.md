@@ -1,16 +1,78 @@
-# React + Vite
+# BIAP
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+## Biomedical Image Analysis Platform
 
-Currently, two official plugins are available:
+![BIAP Dashboard](docs/images/dashboard.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+**BIAP** is an open-source platform for biomedical image analysis and AI-driven scientific workflows.
 
-## React Compiler
+The project aims to provide a modular environment for managing biomedical imaging experiments, developing and evaluating AI models, and integrating modern techniques such as Computer Vision, Deep Learning, Graph Neural Networks (GNNs), Large Language Models (LLMs), and AI agents into a unified research platform.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## 🚧 Project Status
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+> **This project is currently under active development.**
+
+The current focus is on building a robust software architecture before implementing the complete set of AI and biomedical imaging capabilities.
+
+### Current Progress
+
+- ✅ FastAPI backend
+- ✅ React frontend
+- ✅ Experiment management
+- ✅ REST API architecture
+- ✅ Modular frontend/backend structure
+
+---
+
+## Planned Features
+
+- Experiment management
+- Biomedical image viewer
+- Image annotation
+- Dataset management
+- Computer Vision pipelines
+- Machine Learning & Deep Learning models
+- Graph Neural Networks (GNNs)
+- Large Language Models (LLMs)
+- AI-assisted scientific workflows
+- Interactive dashboards
+- Docker deployment
+
+---
+
+## Technology Stack
+
+### Backend
+
+- Python
+- FastAPI
+- Pydantic
+
+### Frontend
+
+- React
+- Vite
+
+### AI & Data Science (planned)
+
+- PyTorch
+- OpenCV
+- MONAI
+- PyTorch Geometric
+- Hugging Face Transformers
+
+---
+
+## Vision
+
+BIAP aims to become a modern research platform that bridges biomedical imaging, computer vision, machine learning, and generative AI to support reproducible scientific workflows from data exploration to model development and analysis.
+
+---
+
+## Repository Status
+
+The architecture and features are evolving continuously as the platform is developed.
+
+Feedback, ideas, and future contributions are welcome.
