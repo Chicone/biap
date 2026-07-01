@@ -1,13 +1,20 @@
 import DashboardLayout from "./components/layout/DashboardLayout";
-import ExperimentTable from "./components/ExperimentTable";
+import ExperimentTable from "./components/experiments/ExperimentTable";
 import { useEffect, useState } from "react";
 import "./App.css";
-import { getExperiments , createExperiment } from "./services/experimentService";
 import CreateExperimentModal from "./components/experiments/CreateExperimentModal";
+import ExperimentWorkspace from "./components/experiments/ExperimentWorkspace";
+import {
+  getExperiments,
+  createExperiment,
+  getExperimentById,
+} from "./services/experimentService";
+
 
 function App() {
   const [experiments, setExperiments] = useState([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedExperiment, setSelectedExperiment] = useState(null);
 
   useEffect(() => {
     async function loadExperiments() {
@@ -31,6 +38,15 @@ function App() {
     ]);
 
     setIsCreateModalOpen(false);
+  }
+
+  async function handleSelectExperiment(experimentId) {
+    try {
+      const experiment = await getExperimentById(experimentId);
+      setSelectedExperiment(experiment);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   return (
@@ -68,7 +84,17 @@ function App() {
         </div>
       </section>
 
-      <ExperimentTable experiments={experiments} />
+      {selectedExperiment ? (
+        <ExperimentWorkspace
+          experiment={selectedExperiment}
+          onBack={() => setSelectedExperiment(null)}
+        />
+      ) : (
+        <ExperimentTable
+          experiments={experiments}
+          onSelectExperiment={handleSelectExperiment}
+        />
+      )}
 
       {isCreateModalOpen && (
         <CreateExperimentModal

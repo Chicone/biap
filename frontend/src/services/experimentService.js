@@ -25,3 +25,13 @@ export async function createExperiment(experiment) {
 
   return response.json();
 }
+
+export async function getExperimentById(experimentId) {
+  const response = await fetch(`${API_URL}/experiments/${experimentId}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load experiment");
+  }
+
+  return response.json();
+}

@@ -261,3 +261,117 @@ td {
   background: #e2e8f0;
   color: #334155;
 }
+
+tbody tr {
+  cursor: pointer;
+}
+
+tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* ===========================
+   Experiment Workspace
+=========================== */
+
+.experiment-workspace {
+  margin-top: 24px;
+}
+
+.workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.workspace-header h3 {
+  margin-bottom: 6px;
+}
+
+.workspace-header p {
+  color: #64748b;
+}
+
+.badge {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ready {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.running {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.workspace-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  padding: 12px 18px;
+  cursor: pointer;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.tab:hover {
+  color: #2563eb;
+}
+
+.active-tab {
+  color: #2563eb;
+  border-bottom: 3px solid #2563eb;
+}
+
+.workspace-content {
+  padding-top: 10px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.summary-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.summary-card span {
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.summary-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.workspace-content .panel {
+  box-shadow: none;
+  border: 1px solid #e2e8f0;
+}
+
+.overview-description {
+  margin-top: 24px;
+}

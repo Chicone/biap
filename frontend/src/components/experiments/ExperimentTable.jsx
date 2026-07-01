@@ -1,4 +1,4 @@
-function ExperimentTable({ experiments }) {
+function ExperimentTable({ experiments, onSelectExperiment }) {
   return (
     <section className="panel">
       <div className="panel-header">
@@ -18,7 +18,7 @@ function ExperimentTable({ experiments }) {
 
         <tbody>
           {experiments.map((exp) => (
-            <tr key={exp.id}>
+            <tr key={exp.id} onClick={() => onSelectExperiment(exp.id)}>
               <td>{exp.name}</td>
               <td>{exp.domain}</td>
               <td>{exp.status}</td>
