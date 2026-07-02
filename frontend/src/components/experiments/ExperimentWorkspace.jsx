@@ -1,105 +1,81 @@
 import { useState } from "react";
 import OverviewTab from "./OverviewTab";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import DatasetsTab from "./DatasetsTab";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function ExperimentWorkspace({ experiment, onBack }) {
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
-    <section className="panel experiment-workspace">
-      <button className="secondary-button back-button" onClick={onBack}>
-        ← Back to Experiments
-      </button>
-      <div className="workspace-header">
-        <div>
-          <h3>{experiment.name}</h3>
-          <p>{experiment.description || "No description provided."}</p>
+    <Card className="experiment-workspace">
+      <CardHeader>
+        <Button variant="secondary" className="back-button" onClick={onBack}>
+          ← Back to Experiments
+        </Button>
+
+        <div className="workspace-header">
+          <div>
+            <CardTitle>{experiment.name}</CardTitle>
+            <CardDescription>
+              {experiment.description || "No description provided."}
+            </CardDescription>
+          </div>
+
+          <Badge>{experiment.status}</Badge>
         </div>
+      </CardHeader>
 
-        <span className="badge ready">{experiment.status}</span>
-      </div>
+      <CardContent>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="datasets">Datasets</TabsTrigger>
+            <TabsTrigger value="images">Images</TabsTrigger>
+            <TabsTrigger value="annotations">Annotations</TabsTrigger>
+            <TabsTrigger value="models">Models</TabsTrigger>
+            <TabsTrigger value="results">Results</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+          </TabsList>
 
-      <div className="workspace-tabs">
-        <button
-          className={activeTab === "overview" ? "tab active-tab" : "tab"}
-          onClick={() => setActiveTab("overview")}
-        >
-          Overview
-        </button>
+          <TabsContent value="overview">
+            <OverviewTab experiment={experiment} />
+          </TabsContent>
 
-        <button
-          className={activeTab === "datasets" ? "tab active-tab" : "tab"}
-          onClick={() => setActiveTab("datasets")}
-        >
-          Datasets
-        </button>
+          <TabsContent value="datasets">
+            <DatasetsTab experimentId={experiment.id} />
+          </TabsContent>
 
-        <button
-          className={activeTab === "images" ? "tab active-tab" : "tab"}
-          onClick={() => setActiveTab("images")}
-        >
-          Images
-        </button>
+          <TabsContent value="images">
+            <p>Image explorer coming soon.</p>
+          </TabsContent>
 
-        <button
-          className={activeTab === "annotations" ? "tab active-tab" : "tab"}
-          onClick={() => setActiveTab("annotations")}
-        >
-          Annotations
-        </button>
+          <TabsContent value="annotations">
+            <p>Annotation tools coming soon.</p>
+          </TabsContent>
 
-        <button
-          className={activeTab === "models" ? "tab active-tab" : "tab"}
-          onClick={() => setActiveTab("models")}
-        >
-          Models
-        </button>
+          <TabsContent value="models">
+            <p>Model workspace coming soon.</p>
+          </TabsContent>
 
-       <button
-          className={activeTab === "results" ? "tab active-tab" : "tab"}
-          onClick={() => setActiveTab("results")}
-        >
-          Results
-        </button>
+          <TabsContent value="results">
+            <p>Results dashboard coming soon.</p>
+          </TabsContent>
 
-        <button
-          className={activeTab === "reports" ? "tab active-tab" : "tab"}
-          onClick={() => setActiveTab("reports")}
-        >
-          Reports
-        </button>
-
-      </div>
-
-      <div className="workspace-content">
-        {activeTab === "overview" && (
-          <OverviewTab experiment={experiment} />
-        )}
-
-        {activeTab === "datasets" && (
-          <p>Datasets module coming soon.</p>
-        )}
-
-        {activeTab === "images" && (
-          <p>Image explorer coming soon.</p>
-        )}
-
-        {activeTab === "annotations" && (
-          <p>Annotation tools coming soon.</p>
-        )}
-
-        {activeTab === "models" && (
-          <p>Model workspace coming soon.</p>
-        )}
-
-        {activeTab === "results" && (
-          <p>Results dashboard coming soon.</p>
-        )}
-
-        {activeTab === "reports" && (
-          <p>Scientific reports coming soon.</p>
-        )}
-      </div>
-    </section>
+          <TabsContent value="reports">
+            <p>Scientific reports coming soon.</p>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 }
 

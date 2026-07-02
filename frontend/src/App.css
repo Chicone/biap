@@ -96,15 +96,7 @@ nav a:hover {
   color: #64748b;
 }
 
-button {
-  border: none;
-  background: #2563eb;
-  color: white;
-  padding: 12px 18px;
-  border-radius: 10px;
-  font-weight: 700;
-  cursor: pointer;
-}
+
 
 .cards {
   display: grid;
@@ -162,23 +154,6 @@ th {
 td {
   padding: 16px 0;
   border-top: 1px solid #e2e8f0;
-}
-
-.badge {
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.running {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.ready {
-  background: #dcfce7;
-  color: #15803d;
 }
 
 .draft {
@@ -293,47 +268,6 @@ tbody tr:hover {
   color: #64748b;
 }
 
-.badge {
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.ready {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.running {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.workspace-tabs {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.tab {
-  background: transparent;
-  border: none;
-  padding: 12px 18px;
-  cursor: pointer;
-  color: #64748b;
-  font-weight: 600;
-}
-
-.tab:hover {
-  color: #2563eb;
-}
-
-.active-tab {
-  color: #2563eb;
-  border-bottom: 3px solid #2563eb;
-}
 
 .workspace-content {
   padding-top: 10px;
@@ -374,4 +308,46 @@ tbody tr:hover {
 
 .overview-description {
   margin-top: 24px;
+}
+
+.back-button {
+  width: fit-content;
+  margin-bottom: 20px;
+}
+
+.experiment-workspace {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+}
+
+.workspace-content {
+  padding-top: 24px;
+}
+
+.dataset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.dataset-header h3 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.dataset-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.dataset-header button {
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.workspace-content table {
+  margin-top: 8px;
 }

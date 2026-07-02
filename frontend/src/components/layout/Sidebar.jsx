@@ -1,3 +1,5 @@
+import { NavLink } from "react-router-dom";
+
 function Sidebar() {
   return (
     <aside className="sidebar">
@@ -8,11 +10,27 @@ function Sidebar() {
           <p>Biomedical Intelligence Platform</p>
         </div>
       </div>
-
       <nav>
-        <a className="active">🏠 Dashboard</a>
-        <a>🧪 Experiments</a>
-        <a>⚙ Settings</a>
+        <NavLink
+          to="/dashboard"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
+          🏠 Dashboard
+        </NavLink>
+
+        <NavLink
+          to="/experiments"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
+          🧪 Experiments
+        </NavLink>
+
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
+          ⚙ Settings
+        </NavLink>
       </nav>
     </aside>
   );
