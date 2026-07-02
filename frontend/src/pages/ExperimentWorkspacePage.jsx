@@ -3,12 +3,15 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import ExperimentWorkspace from "@/components/experiments/ExperimentWorkspace";
 import { getExperimentById } from "@/services/experimentService";
+import { useSearchParams } from "react-router-dom";
 
 function ExperimentWorkspacePage() {
   const [experiment, setExperiment] = useState(null);
 
   const { experimentId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "overview";
 
   useEffect(() => {
     async function loadExperiment() {
@@ -26,6 +29,7 @@ function ExperimentWorkspacePage() {
   return (
     <ExperimentWorkspace
       experiment={experiment}
+      initialTab={initialTab}
       onBack={() => navigate("/experiments")}
     />
   );

@@ -351,3 +351,51 @@ tbody tr:hover {
 .workspace-content table {
   margin-top: 8px;
 }
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.image-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.image-placeholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: #e2e8f0;
+  color: #475569;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.image-thumbnail {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.image-card strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.image-card p {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 13px;
+}

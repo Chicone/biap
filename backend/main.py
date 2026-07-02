@@ -1,9 +1,19 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
+from fastapi import UploadFile, File
+from PIL import Image
+import shutil
+from pathlib import Path
 
 app = FastAPI()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_ROOT = BASE_DIR / "data" / "raw"
+DATA_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/data", StaticFiles(directory=BASE_DIR / "data"), name="data")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -54,10 +64,30 @@ datasets = {
     2: [],
 }
 
+images = {
+    1: [
+        {
+            "id": 1,
+            "dataset_id": 1,
+            "filename": "demo_cell_image_001.png",
+            "width": 1024,
+            "height": 768,
+            "modality": "Microscopy",
+            "status": "Imported",
+        }
+    ]
+}
+
 class DatasetCreate(BaseModel):
   name: str
   dataset_type: str
   description: str | None = None
+
+class ImageCreate(BaseModel):
+  filename: str
+  width: int
+  height: int
+  modality: str | None = None
 
 @app.get("/experiments")
 def get_experiments():
@@ -129,3 +159,60 @@ def create_dataset(experiment_id: int, dataset: DatasetCreate):
 
     datasets[experiment_id].append(new_dataset)
     return new_dataset
+
+@app.get("/datasets/{dataset_id}/images")
+def get_images(dataset_id: int):
+    if dataset_id not in images:
+        images[dataset_id] = []
+
+    return images[dataset_id]
+
+
+@app.post("/datasets/{dataset_id}/images")
+def create_image(dataset_id: int, image: ImageCreate):
+    if dataset_id not in images:
+        images[dataset_id] = []
+
+    new_image = {
+        "id": len(images[dataset_id]) + 1,
+        "dataset_id": dataset_id,
+        "filename": image.filename,
+        "width": image.width,
+        "height": image.height,
+        "modality": image.modality,
+        "status": "Imported",
+    }
+
+    images[dataset_id].append(new_image)
+    return new_image
+
+@app.post("/datasets/{dataset_id}/upload")
+async def upload_image(dataset_id: int, file: UploadFile = File(...)):
+    dataset_dir = DATA_ROOT / f"dataset_{dataset_id}"
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+
+    destination = dataset_dir / file.filename
+
+    with destination.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    with Image.open(destination) as img:
+        width, height = img.size
+
+    if dataset_id not in images:
+        images[dataset_id] = []
+
+    new_image = {
+      "id": len(images[dataset_id]) + 1,
+      "dataset_id": dataset_id,
+      "filename": file.filename,
+      "width": width,
+      "height": height,
+      "modality": "Unknown",
+      "status": "Imported",
+      "url": f"/data/raw/dataset_{dataset_id}/{file.filename}",
+    }
+
+    images[dataset_id].append(new_image)
+
+    return new_image

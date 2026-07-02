@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ExperimentsPage from "@/pages/ExperimentsPage";
 import ExperimentWorkspacePage from "@/pages/ExperimentWorkspacePage";
+import DatasetWorkspacePage from "@/pages/DatasetWorkspacePage";
 
 function DashboardPage() {
   return (
@@ -29,7 +30,12 @@ function App() {
         <Route path="/" element={<Navigate to="/experiments" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/experiments" element={<ExperimentsPage />} />
-        <Route path="/experiments/:experimentId" element={<ExperimentWorkspacePage />} />
+        <Route path="/experiments/:experimentId"
+          element={<ExperimentWorkspacePage />}
+        />
+        <Route path="/experiments/:experimentId/datasets/:datasetId"
+          element={<DatasetWorkspacePage />}
+        />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </DashboardLayout>

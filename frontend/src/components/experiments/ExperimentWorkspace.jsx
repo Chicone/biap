@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-function ExperimentWorkspace({ experiment, onBack }) {
-  const [activeTab, setActiveTab] = useState("overview");
+function ExperimentWorkspace({ experiment, onBack, initialTab = "overview" }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeDataset, setActiveDataset] = useState(null);
 
   return (
     <Card className="experiment-workspace">
@@ -39,8 +40,6 @@ function ExperimentWorkspace({ experiment, onBack }) {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="datasets">Datasets</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
-            <TabsTrigger value="annotations">Annotations</TabsTrigger>
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -51,15 +50,11 @@ function ExperimentWorkspace({ experiment, onBack }) {
           </TabsContent>
 
           <TabsContent value="datasets">
-            <DatasetsTab experimentId={experiment.id} />
-          </TabsContent>
-
-          <TabsContent value="images">
-            <p>Image explorer coming soon.</p>
-          </TabsContent>
-
-          <TabsContent value="annotations">
-            <p>Annotation tools coming soon.</p>
+            <DatasetsTab
+              experimentId={experiment.id}
+              activeDataset={activeDataset}
+              onSelectDataset={setActiveDataset}
+            />
           </TabsContent>
 
           <TabsContent value="models">
