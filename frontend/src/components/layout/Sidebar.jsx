@@ -1,35 +1,49 @@
 import { NavLink } from "react-router-dom";
 
-function Sidebar() {
+function Sidebar({ collapsed, onToggle }) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
+      <button
+        className="sidebar-toggle"
+        onClick={onToggle}
+      >
+        {collapsed ? "➡" : "⬅"}
+      </button>
+
       <div className="brand">
         <div className="brand-icon">B</div>
-        <div>
-          <h1>BIAP</h1>
-          <p>Biomedical Intelligence Platform</p>
-        </div>
+
+        {!collapsed && (
+          <div>
+            <h1>BIAP</h1>
+            <p>Biomedical Intelligence Platform</p>
+          </div>
+        )}
       </div>
+
       <nav>
         <NavLink
           to="/dashboard"
           className={({ isActive }) => (isActive ? "active" : "")}
         >
-          🏠 Dashboard
+          <span>🏠</span>
+          {!collapsed && <span>Dashboard</span>}
         </NavLink>
 
         <NavLink
           to="/experiments"
           className={({ isActive }) => (isActive ? "active" : "")}
         >
-          🧪 Experiments
+          <span>🧪</span>
+          {!collapsed && <span>Experiments</span>}
         </NavLink>
 
         <NavLink
           to="/settings"
           className={({ isActive }) => (isActive ? "active" : "")}
         >
-          ⚙ Settings
+          <span>⚙</span>
+          {!collapsed && <span>Settings</span>}
         </NavLink>
       </nav>
     </aside>
