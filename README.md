@@ -1,78 +1,305 @@
 # BIAP
 
-## Biomedical Image Analysis Platform
+# Biomedical Image Analysis Platform
 
 ![BIAP Dashboard](docs/images/dashboard.png)
 
-**BIAP** is an open-source platform for biomedical image analysis and AI-driven scientific workflows.
+**BIAP** is an open-source platform for quantitative biomedical image analysis and AI-assisted scientific workflows.
 
-The project aims to provide a modular environment for managing biomedical imaging experiments, developing and evaluating AI models, and integrating modern techniques such as Computer Vision, Deep Learning, Graph Neural Networks (GNNs), Large Language Models (LLMs), and AI agents into a unified research platform.
+The current implementation provides a modular image analysis workspace for microscopy datasets, supporting image exploration, classical computer vision, quantitative evaluation, and an architecture designed to grow toward modern AI-driven biomedical research.
+
+Rather than being a collection of isolated tools, BIAP is designed as a modular scientific platform supporting reproducible experiments, interpretable AI models, and interactive exploration of biomedical datasets.
 
 ---
 
-## 🚧 Project Status
+# 🚧 Current Status
 
-> **This project is currently under active development.**
+> **This project is under active development.**
 
-The current focus is on building a robust software architecture before implementing the complete set of AI and biomedical imaging capabilities.
+The platform has completed the first stage of the Computer Vision module.
 
-### Current Progress
+## Current milestone
+
+### Image Analysis Workspace v2
+
+The current workspace provides an interactive environment for biomedical image analysis, including image visualisation, segmentation, quantitative evaluation, and dataset navigation.
+
+Implemented
 
 - ✅ FastAPI backend
 - ✅ React frontend
-- ✅ Experiment management
-- ✅ REST API architecture
-- ✅ Modular frontend/backend structure
+- ✅ Dataset management
+- ✅ Biomedical image browser
+- ✅ BBBC038 dataset support
+- ✅ Modular Image Analysis Workspace
+- ✅ Otsu image segmentation
+- ✅ Prediction overlays
+- ✅ Ground-truth overlays
+- ✅ Quantitative segmentation evaluation
 
 ---
 
-## Planned Features
+# Current Features
 
-- Experiment management
-- Biomedical image viewer
-- Image annotation
-- Dataset management
-- Computer Vision pipelines
-- Machine Learning & Deep Learning models
-- Graph Neural Networks (GNNs)
-- Large Language Models (LLMs)
-- AI-assisted scientific workflows
-- Interactive dashboards
-- Docker deployment
+## Dataset Management
+
+- Import biomedical image datasets
+- Folder-based dataset registration
+- Thumbnail generation
+- Dataset browsing
+- High-resolution image preview
 
 ---
 
-## Technology Stack
+## Image Analysis Workspace
 
-### Backend
+Current analysis module
+
+### Segmentation
+
+Implemented functionality
+
+- Otsu threshold segmentation
+- Bright/Dark foreground detection
+- Prediction overlay visualisation
+- Ground-truth overlay visualisation
+- Connected component analysis
+- Region measurements
+
+Automatic evaluation
+
+- Intersection over Union (IoU)
+- Dice coefficient
+- Precision
+- Recall
+
+The frontend is organised around a modular image analysis architecture, allowing future analysis techniques to be added independently.
+
+Planned analysis modules
+
+- Morphology
+- Texture Analysis
+- Intensity Analysis
+- Feature Extraction
+- Deep Learning Segmentation
+
+---
+
+# Architecture
+
+```
+React Frontend
+        │
+        ▼
+FastAPI Backend
+        │
+ ┌─────────────┬──────────────┬──────────────┬──────────────┐
+ │             │              │              │
+ Dataset     Vision         ML Engine      AI Engine
+ Manager     Engine         (future)       (future)
+        │
+        ▼
+ Experiment Manager
+        │
+        ▼
+ Results / Models / Reports
+```
+
+The frontend communicates exclusively through REST APIs and is organised around reusable image-analysis components.
+
+The Vision Engine is implemented as independent modules, allowing new computer vision algorithms to be integrated without redesigning the application.
+
+---
+
+# Technology Stack
+
+## Backend
 
 - Python
 - FastAPI
-- Pydantic
+- NumPy
+- scikit-image
+- OpenCV
 
-### Frontend
+## Frontend
 
 - React
 - Vite
+- shadcn/ui
 
-### AI & Data Science (planned)
+## AI & Scientific Computing
+
+Current
+
+- NumPy
+- scikit-image
+
+Planned
 
 - PyTorch
-- OpenCV
 - MONAI
 - PyTorch Geometric
 - Hugging Face Transformers
 
 ---
 
-## Vision
+---
 
-BIAP aims to become a modern research platform that bridges biomedical imaging, computer vision, machine learning, and generative AI to support reproducible scientific workflows from data exploration to model development and analysis.
+# Installation
+
+## Prerequisites
+
+- Git
+- Python 3.12+
+- Node.js 20+
+- npm
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Chicone/biap.git
+cd biap
+```
 
 ---
 
-## Repository Status
+## Backend Setup
 
-The architecture and features are evolving continuously as the platform is developed.
+Create and activate a Python environment.
 
-Feedback, ideas, and future contributions are welcome.
+Using Conda:
+
+```bash
+conda create -n biap python=3.12
+conda activate biap
+```
+
+Or using a virtual environment:
+
+```bash
+python -m venv .venv
+```
+
+Linux/macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+Windows:
+
+```powershell
+.venv\Scripts\activate
+```
+
+Install the backend dependencies:
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+Start the FastAPI backend:
+
+```bash
+cd backend
+uvicorn app.main:app --reload
+```
+
+The backend will be available at:
+
+```
+http://127.0.0.1:8000
+```
+
+---
+
+## Frontend Setup
+
+Open a second terminal.
+
+Install the frontend dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The frontend will be available at:
+
+```
+http://127.0.0.1:5173
+```
+
+---
+
+## Running BIAP
+
+Start both the backend and frontend, then open:
+
+```
+http://127.0.0.1:5173
+```
+
+---
+
+
+# Development Roadmap
+
+### Phase 2 — Computer Vision
+
+- Image preprocessing
+- Cell segmentation
+- Morphological analysis
+- Feature extraction
+
+### Phase 3 — Classical Machine Learning
+
+- Feature engineering
+- Classification
+- Regression
+
+### Phase 4 — Deep Learning
+
+- CNN-based segmentation
+- Embedding extraction
+- Transfer learning
+
+### Phase 5 — Graph Neural Networks
+
+- Cell graph construction
+- Tissue modelling
+- Phenotype prediction
+
+### Phase 6 — Large Language Models
+
+- Scientific report generation
+- Literature-assisted interpretation
+- Interactive AI assistant
+
+### Phase 7 — Agentic AI
+
+- Autonomous experiment analysis
+- Workflow orchestration
+- Multi-step scientific reasoning
+
+---
+
+# Vision
+
+BIAP aims to evolve into a modern AI platform for biomedical imaging research, demonstrating how computer vision, scientific computing, machine learning, graph learning, and generative AI can be integrated into a single reproducible scientific workflow.
+
+The long-term objective is to resemble the AI platforms used in modern pharmaceutical companies and biomedical research institutes, where classical image analysis, AI models, and intelligent assistants work together within a unified research environment.
+
+---
+
+# Contributing
+
+BIAP is under active development and its architecture continues to evolve.
+
+Suggestions, ideas, and contributions are welcome.
