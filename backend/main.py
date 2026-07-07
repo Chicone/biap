@@ -11,7 +11,12 @@ from vision.segmentation import segment_otsu
 from vision.io import load_image, pil_to_numpy
 from vision.preprocessing import to_grayscale
 from vision.segmentation import threshold, connected_components
-from vision.measurements import measure_regions, summarize_regions
+from vision.measurements import (
+    measure_regions,
+    summarize_regions,
+    measure_intensity,
+    summarize_intensity,
+)
 from db import init_db, get_connection
 from io import BytesIO
 from fastapi.responses import StreamingResponse
@@ -405,6 +410,55 @@ def analyze_image(dataset_id: int, image_id: int):
       "num_objects": len(regions),
       "summary": summary,
       "objects": regions,
+    }
+
+@app.get("/datasets/{dataset_id}/images/{image_id}/intensity")
+def analyze_image_intensity(
+    dataset_id: int,
+    image_id: int,
+    foreground: str = "bright",
+):
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM images
+            WHERE dataset_id = ? AND id = ?
+            """,
+            (dataset_id, image_id),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_record = dict(row)
+
+    image_path = DATA_ROOT / image_record["filename"]
+
+    image = load_image(image_path)
+    image_array = pil_to_numpy(image)
+
+    gray = to_grayscale(image_array)
+
+    binary, otsu_value = segment_otsu(
+        gray,
+        foreground=foreground,
+        return_threshold=True,
+    )
+
+    labels = connected_components(binary)
+
+    intensity = measure_intensity(labels, gray)
+    summary = summarize_intensity(intensity)
+
+    return {
+        "dataset_id": dataset_id,
+        "image_id": image_id,
+        "filename": image_record["filename"],
+        "threshold": otsu_value,
+        "num_objects": len(intensity),
+        "summary": summary,
+        "objects": intensity,
     }
 
 @app.get("/datasets/{dataset_id}/images/{image_id}/overlay")

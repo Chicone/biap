@@ -15,9 +15,12 @@ function ImageViewer({
       return `http://127.0.0.1:8000${selectedImage.url}`;
     }
 
-    if (analysisType === "morphology" && selectedObjectLabel !== null) {
-      return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/objects/${selectedObjectLabel}/overlay?foreground=${foreground}&t=${Date.now()}`;
-    }
+    const supportsObjectSelection =
+      analysisType === "morphology" ||
+      analysisType === "intensity";
+
+    if (supportsObjectSelection && selectedObjectLabel !== null) {
+      return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/objects/${selectedObjectLabel}/overlay?foreground=${foreground}&t=${Date.now()}`;    }
 
     if (overlayMode === "groundTruth") {
       return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/ground-truth-overlay`;

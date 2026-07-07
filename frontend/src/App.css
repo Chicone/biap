@@ -941,11 +941,11 @@ tbody tr:hover {
   font-variant-numeric: tabular-nums;
 }
 
-.morphology-module + .analysis-panels {
+.intensity-module + .analysis-panels {
   grid-template-columns: 1fr;
 }
 
-.morphology-module + .analysis-panels .analysis-panel {
+.intensity-module + .analysis-panels .analysis-panel {
   width: 100%;
 }
 
@@ -965,4 +965,12 @@ tbody tr:hover {
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+.intensity-module + .analysis-panels {
+  grid-template-columns: 1fr;
+}
+
+.intensity-module + .analysis-panels .analysis-panel {
+  width: 100%;
 }

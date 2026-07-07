@@ -15,6 +15,8 @@ import SegmentationResults from "@/components/experiments/image_analysis/segment
 import AnalysisSelector from "@/components/experiments/image_analysis/AnalysisSelector";
 import MorphologyPanel from "@/components/experiments/image_analysis/morphology/MorphologyPanel";
 import MorphologyResults from "@/components/experiments/image_analysis/morphology/MorphologyResults";
+import IntensityPanel from "@/components/experiments/image_analysis/intensity/IntensityPanel";
+import IntensityResults from "@/components/experiments/image_analysis/intensity/IntensityResults";
 
 const API_URL = "http://127.0.0.1:8000";
 
@@ -124,6 +126,37 @@ function ImagesTab({ activeDataset }) {
     }
   }
 
+  async function handleAnalyzeIntensity() {
+    if (!activeDataset || !selectedImage) {
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setEvaluationError(null);
+    setEvaluation(null);
+    setSelectedObjectLabel(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/images/${selectedImage.id}/intensity?foreground=${foreground}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Intensity analysis failed");
+      }
+
+      const result = await response.json();
+
+      setAnalysis(result);
+      setOverlayMode("prediction");
+    } catch (error) {
+      setAnalysisError("Intensity analysis failed");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
   return (
     <div className="workspace-content">
       <div className="images-toolbar">
@@ -179,6 +212,10 @@ function ImagesTab({ activeDataset }) {
           analysisType={analysisType}
           setAnalysisType={(nextAnalysisType) => {
             setAnalysisType(nextAnalysisType);
+            setAnalysis(null);
+            setEvaluation(null);
+            setAnalysisError(null);
+            setEvaluationError(null);
             setSelectedObjectLabel(null);
             setOverlayMode("original");
           }}
@@ -225,6 +262,28 @@ function ImagesTab({ activeDataset }) {
             />
           </>
         )}
+
+        {analysisType === "intensity" && (
+        <>
+          <IntensityPanel
+            foreground={foreground}
+            setForeground={setForeground}
+            setAnalysis={setAnalysis}
+            setEvaluation={setEvaluation}
+            setOverlayMode={setOverlayMode}
+            setSelectedObjectLabel={setSelectedObjectLabel}
+            isAnalyzing={isAnalyzing}
+            onRunIntensity={handleAnalyzeIntensity}
+          />
+
+          <IntensityResults
+            analysis={analysis}
+            analysisError={analysisError}
+            onSelectObject={setSelectedObjectLabel}
+          />
+        </>
+      )}
+
       </>
     )}
     </div>

@@ -78,3 +78,57 @@ def summarize_regions(regions: list[dict]) -> dict:
     "mean_circularity": float(np.mean(circularities)),
     "mean_solidity": float(np.mean(solidities)),
   }
+
+def measure_intensity(
+  labels: np.ndarray,
+  image: np.ndarray,
+) -> list[dict]:
+  """
+  Measure intensity statistics for each labelled object.
+  """
+  measurements = []
+
+  for region in regionprops(labels, intensity_image=image):
+    intensity_values = region.intensity_image[region.image]
+
+    measurements.append({
+      "label": int(region.label),
+      "mean_intensity": float(np.mean(intensity_values)),
+      "median_intensity": float(np.median(intensity_values)),
+      "min_intensity": float(np.min(intensity_values)),
+      "max_intensity": float(np.max(intensity_values)),
+      "std_intensity": float(np.std(intensity_values)),
+      "integrated_intensity": float(np.sum(intensity_values)),
+    })
+
+  return measurements
+
+
+def summarize_intensity(intensity_measurements: list[dict]) -> dict:
+  """
+  Compute summary statistics for intensity measurements.
+  """
+  if not intensity_measurements:
+    return {
+      "num_objects": 0,
+      "mean_intensity": 0.0,
+      "median_intensity": 0.0,
+      "mean_integrated_intensity": 0.0,
+    }
+
+  mean_values = np.array(
+    [item["mean_intensity"] for item in intensity_measurements],
+    dtype=float,
+  )
+
+  integrated_values = np.array(
+    [item["integrated_intensity"] for item in intensity_measurements],
+    dtype=float,
+  )
+
+  return {
+    "num_objects": len(intensity_measurements),
+    "mean_intensity": float(np.mean(mean_values)),
+    "median_intensity": float(np.median(mean_values)),
+    "mean_integrated_intensity": float(np.mean(integrated_values)),
+  }
