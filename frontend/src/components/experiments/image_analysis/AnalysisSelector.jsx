@@ -10,6 +10,7 @@ function AnalysisSelector({ analysisType, setAnalysisType }) {
           onChange={(event) => setAnalysisType(event.target.value)}
         >
           <option value="segmentation">Segmentation</option>
+          <option value="morphology">Morphology</option>
         </select>
       </label>
     </section>

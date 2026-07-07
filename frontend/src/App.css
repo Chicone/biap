@@ -871,3 +871,98 @@ tbody tr:hover {
   font: inherit;
   background: white;
 }
+
+.morphology-table {
+    margin-top: 16px;
+}
+
+.morphology-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-top: 16px;
+}
+
+.morphology-table th,
+.morphology-table td {
+  padding: 10px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.morphology-table th {
+  text-align: left;
+  font-weight: 600;
+  background: #f1f5f9;
+}
+
+.morphology-table th:not(:first-child),
+.morphology-table td:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.morphology-table tbody tr {
+  cursor: pointer;
+}
+
+.morphology-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.morphology-selected-row {
+  background: #e0f2fe;
+}
+
+.object-details-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.object-details-panel h5 {
+  margin: 0 0 12px;
+}
+
+.object-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+.object-details-grid span {
+  color: #64748b;
+}
+
+.object-details-grid strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.morphology-module + .analysis-panels {
+  grid-template-columns: 1fr;
+}
+
+.morphology-module + .analysis-panels .analysis-panel {
+  width: 100%;
+}
+
+.morphology-table-container {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: white;
+}
+
+.morphology-table {
+  margin-top: 0;
+}
+
+.morphology-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}

@@ -11,14 +11,14 @@ from vision.segmentation import segment_otsu
 from vision.io import load_image, pil_to_numpy
 from vision.preprocessing import to_grayscale
 from vision.segmentation import threshold, connected_components
-from vision.measurements import measure_regions
+from vision.measurements import measure_regions, summarize_regions
 from db import init_db, get_connection
 from io import BytesIO
 from fastapi.responses import StreamingResponse
 from PIL import Image
 import numpy as np
 
-from vision.visualization import overlay_mask
+from vision.visualization import overlay_mask, overlay_selected_label
 from vision.ground_truth import merge_instance_masks
 from vision.metrics import iou, dice_coefficient, precision, recall
 
@@ -395,14 +395,16 @@ def analyze_image(dataset_id: int, image_id: int):
 
     labels = connected_components(binary)
     regions = measure_regions(labels)
+    summary = summarize_regions(regions)
 
     return {
-        "dataset_id": dataset_id,
-        "image_id": image_id,
-        "filename": image_record["filename"],
-        "threshold": otsu_value,
-        "num_objects": len(regions),
-        "objects": regions,
+      "dataset_id": dataset_id,
+      "image_id": image_id,
+      "filename": image_record["filename"],
+      "threshold": otsu_value,
+      "num_objects": len(regions),
+      "summary": summary,
+      "objects": regions,
     }
 
 @app.get("/datasets/{dataset_id}/images/{image_id}/overlay")
@@ -446,6 +448,63 @@ def get_image_overlay(
         binary,
         color=(255, 0, 0),
         alpha=0.4,
+    )
+
+    output = BytesIO()
+    Image.fromarray(overlay).save(output, format="PNG")
+    output.seek(0)
+
+    return StreamingResponse(output, media_type="image/png")
+
+@app.get("/datasets/{dataset_id}/images/{image_id}/objects/{object_label}/overlay")
+def get_selected_object_overlay(
+    dataset_id: int,
+    image_id: int,
+    object_label: int,
+    foreground: str = "bright",
+):
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM images
+            WHERE dataset_id = ? AND id = ?
+            """,
+            (dataset_id, image_id),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_record = dict(row)
+    image_path = DATA_ROOT / image_record["filename"]
+    image = load_image(image_path)
+    image_array = pil_to_numpy(image)
+
+    gray = to_grayscale(image_array)
+    binary, _ = segment_otsu(
+        gray,
+        foreground=foreground,
+        return_threshold=True,
+    )
+
+    labels = connected_components(binary)
+
+    if not np.any(labels == object_label):
+        raise HTTPException(
+            status_code=404,
+            detail="Object label not found",
+        )
+
+    if image_array.ndim == 2:
+        rgb_image = np.stack([image_array] * 3, axis=-1)
+    else:
+        rgb_image = image_array[:, :, :3]
+
+    overlay = overlay_selected_label(
+        rgb_image,
+        labels,
+        selected_label=object_label,
     )
 
     output = BytesIO()

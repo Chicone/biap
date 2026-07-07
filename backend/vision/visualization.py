@@ -1,5 +1,5 @@
 import numpy as np
-
+from skimage.segmentation import find_boundaries
 
 def label_to_rgb(mask: np.ndarray, color=(255, 0, 0)) -> np.ndarray:
     """
@@ -43,3 +43,22 @@ def overlay_mask(
     overlay = label_to_rgb(mask, color)
 
     return blend_images(image, overlay, alpha)
+
+
+def overlay_selected_label(
+  image: np.ndarray,
+  labels: np.ndarray,
+  selected_label: int,
+  color=(0, 255, 255),
+) -> np.ndarray:
+  """
+  Draw the boundary of one selected labelled object on the original RGB image.
+  """
+  output = image.copy()
+
+  selected_mask = labels == selected_label
+  boundary = find_boundaries(selected_mask, mode="outer")
+
+  output[boundary] = color
+
+  return output

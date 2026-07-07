@@ -51,10 +51,10 @@ function SegmentationResults({
               <div className="analysis-row" key={object.label}>
                 <span>{object.label}</span>
                 <span>{object.area}</span>
-                <span>
-                  ({object.centroid[0].toFixed(1)},{" "}
-                  {object.centroid[1].toFixed(1)})
-                </span>
+               <span>
+                ({object.centroid.row.toFixed(1)},{" "}
+                {object.centroid.col.toFixed(1)})
+              </span>
               </div>
             ))}
           </div>

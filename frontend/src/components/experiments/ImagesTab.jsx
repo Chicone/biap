@@ -13,6 +13,8 @@ import ImageBrowser from "@/components/experiments/image_analysis/ImageBrowser";
 import SegmentationPanel from "@/components/experiments/image_analysis/segmentation/SegmentationPanel";
 import SegmentationResults from "@/components/experiments/image_analysis/segmentation/SegmentationResults";
 import AnalysisSelector from "@/components/experiments/image_analysis/AnalysisSelector";
+import MorphologyPanel from "@/components/experiments/image_analysis/morphology/MorphologyPanel";
+import MorphologyResults from "@/components/experiments/image_analysis/morphology/MorphologyResults";
 
 const API_URL = "http://127.0.0.1:8000";
 
@@ -33,6 +35,8 @@ function ImagesTab({ activeDataset }) {
   const [evaluationError, setEvaluationError] = useState(null);
 
   const [analysisType, setAnalysisType] = useState("segmentation");
+
+  const [selectedObjectLabel, setSelectedObjectLabel] = useState(null);
 
   useEffect(() => {
     async function loadImages() {
@@ -82,9 +86,11 @@ function ImagesTab({ activeDataset }) {
     setSelectedImage(image);
     setOverlayMode("original");
     clearResults();
+    setSelectedObjectLabel(null);
   }
 
   async function handleAnalyzeImage() {
+    setSelectedObjectLabel(null);
     if (!activeDataset || !selectedImage) {
       return;
     }
@@ -163,13 +169,19 @@ function ImagesTab({ activeDataset }) {
         selectedImage={selectedImage}
         overlayMode={overlayMode}
         foreground={foreground}
+        selectedObjectLabel={selectedObjectLabel}
+        analysisType={analysisType}
       />
 
      {selectedImage && (
       <>
         <AnalysisSelector
           analysisType={analysisType}
-          setAnalysisType={setAnalysisType}
+          setAnalysisType={(nextAnalysisType) => {
+            setAnalysisType(nextAnalysisType);
+            setSelectedObjectLabel(null);
+            setOverlayMode("original");
+          }}
         />
 
         {analysisType === "segmentation" && (
@@ -190,6 +202,26 @@ function ImagesTab({ activeDataset }) {
               analysisError={analysisError}
               evaluation={evaluation}
               evaluationError={evaluationError}
+            />
+          </>
+        )}
+
+        {analysisType === "morphology" && (
+          <>
+            <MorphologyPanel
+              foreground={foreground}
+              setForeground={setForeground}
+              setAnalysis={setAnalysis}
+              setEvaluation={setEvaluation}
+              setOverlayMode={setOverlayMode}
+              setSelectedObjectLabel={setSelectedObjectLabel}
+              isAnalyzing={isAnalyzing}
+              onRunMorphology={handleAnalyzeImage}
+            />
+            <MorphologyResults
+              analysis={analysis}
+              analysisError={analysisError}
+              onSelectObject={setSelectedObjectLabel}
             />
           </>
         )}
