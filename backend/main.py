@@ -16,6 +16,8 @@ from vision.measurements import (
     summarize_regions,
     measure_intensity,
     summarize_intensity,
+    measure_texture,
+    summarize_texture,
 )
 from db import init_db, get_connection
 from io import BytesIO
@@ -459,6 +461,53 @@ def analyze_image_intensity(
         "num_objects": len(intensity),
         "summary": summary,
         "objects": intensity,
+    }
+
+@app.get("/datasets/{dataset_id}/images/{image_id}/texture")
+def analyze_image_texture(
+    dataset_id: int,
+    image_id: int,
+    foreground: str = "bright",
+):
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM images
+            WHERE dataset_id = ? AND id = ?
+            """,
+            (dataset_id, image_id),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_record = dict(row)
+    image_path = DATA_ROOT / image_record["filename"]
+
+    image = load_image(image_path)
+    image_array = pil_to_numpy(image)
+    gray = to_grayscale(image_array)
+
+    binary, otsu_value = segment_otsu(
+        gray,
+        foreground=foreground,
+        return_threshold=True,
+    )
+
+    labels = connected_components(binary)
+
+    texture = measure_texture(labels, gray)
+    summary = summarize_texture(texture)
+
+    return {
+        "dataset_id": dataset_id,
+        "image_id": image_id,
+        "filename": image_record["filename"],
+        "threshold": otsu_value,
+        "num_objects": len(texture),
+        "summary": summary,
+        "objects": texture,
     }
 
 @app.get("/datasets/{dataset_id}/images/{image_id}/overlay")

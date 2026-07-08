@@ -4,7 +4,7 @@
 
 BIAP follows a modular client-server architecture designed for extensible biomedical image analysis and AI-assisted scientific workflows.
 
-```
+```text
 React Frontend
         │
         ▼
@@ -30,9 +30,7 @@ Each backend module is responsible for a single domain and can evolve independen
 
 # Frontend Architecture
 
-The Images workspace is now organised around independent analysis modules.
-
-```
+```text
 ImagesTab
 │
 ├── ImageViewer
@@ -43,32 +41,31 @@ ImagesTab
 │      ├── SegmentationPanel
 │      └── SegmentationResults
 │
+├── Morphology
+│      ├── MorphologyPanel
+│      └── MorphologyResults
+│
+├── Intensity
+│      ├── IntensityPanel
+│      └── IntensityResults
+│
 └── ImageBrowser
 ```
 
-Future analysis modules will follow the same structure.
+Only the selected analysis module is rendered.
 
-```
-ImagesTab
-│
-├── ImageViewer
-├── AnalysisSelector
-│
-├── Segmentation
-├── Morphology
-├── Texture
-├── Intensity
-├── Feature Extraction
-└── ...
-```
+Future modules
 
-Only the currently selected analysis module is rendered.
+- Texture
+- Feature Extraction
+- Machine Learning
+- Deep Learning
 
 ---
 
 # Backend Architecture
 
-```
+```text
 backend/
 │
 ├── api/
@@ -85,7 +82,11 @@ backend/
       └── metrics.py
 ```
 
-The Vision Engine is intentionally modular so that new computer vision algorithms can be added independently.
+The Vision Engine is intentionally modular.
+
+Segmentation produces labelled objects.
+
+Object-analysis modules (Morphology, Intensity, Texture, etc.) operate on those segmented objects.
 
 ---
 

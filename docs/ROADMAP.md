@@ -13,10 +13,17 @@ Biomedical Image Explorer
 ## Phase 2
 Computer Vision
 
+Completed
+
 - Image preprocessing
 - Cell segmentation
+- Morphological analysis
+- Intensity analysis
+
+Next
+
+- Texture analysis
 - Feature extraction
-- Quantitative measurements
 
 ---
 

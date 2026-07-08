@@ -1,6 +1,6 @@
 # BIAP Current State
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 ---
 
@@ -12,7 +12,7 @@ Last updated: 2026-07-06
 
 BIAP has evolved from a dataset browser into a modular biomedical image analysis platform.
 
-The Images workspace has been redesigned to support multiple image analysis modules while maintaining a clean, extensible architecture.
+The Images workspace now supports multiple independent image analysis modules built on a common architecture.
 
 ---
 
@@ -33,7 +33,7 @@ Implemented
 
 Current modules
 
-```
+```text
 backend/
     vision/
         io.py
@@ -48,10 +48,13 @@ backend/
 Implemented functionality
 
 - Otsu threshold segmentation
+- Bright/Dark foreground selection
 - Connected component analysis
-- Region measurements
+- Morphological measurements
+- Intensity measurements
 - Prediction overlay generation
 - Ground-truth overlay generation
+- Selected-object overlay
 - Ground-truth mask merging
 - Segmentation evaluation
 
@@ -79,13 +82,20 @@ Implemented
 
 Current architecture
 
-```
+```text
 ImagesTab
 │
 ├── ImageViewer
 ├── AnalysisSelector
-├── SegmentationPanel
-├── SegmentationResults
+├── Segmentation
+│     ├── SegmentationPanel
+│     └── SegmentationResults
+├── Morphology
+│     ├── MorphologyPanel
+│     └── MorphologyResults
+├── Intensity
+│     ├── IntensityPanel
+│     └── IntensityResults
 └── ImageBrowser
 ```
 
@@ -95,8 +105,10 @@ Implemented functionality
 - Scrollable thumbnail browser
 - Prediction overlays
 - Ground-truth overlays
-- Bright / Dark foreground selection
+- Bright/Dark foreground selection
 - Automatic segmentation evaluation
+- Interactive object selection
+- Object highlighting on the original image
 - Modular analysis architecture
 
 ---
@@ -123,16 +135,17 @@ The platform can
 - Display ground-truth overlays
 - Run Otsu segmentation
 - Detect connected objects
-- Measure segmented regions
+- Perform morphology analysis
+- Perform intensity analysis
+- Highlight selected objects
 - Compare prediction against ground truth
 - Compute IoU, Dice, Precision and Recall
-- Support future image-analysis modules through a modular frontend architecture
 
 ---
 
 # Current Image Analysis Architecture
 
-```
+```text
 Image Preview
 
 ↓
@@ -155,12 +168,12 @@ Scrollable Image Browser
 Currently implemented analysis
 
 - Segmentation
+- Morphology
+- Intensity
 
 Future analysis modules
 
-- Morphology
 - Texture
-- Intensity
 - Feature Extraction
 - Classical Machine Learning
 - Deep Learning
@@ -168,23 +181,41 @@ Future analysis modules
 
 ---
 
-# Immediate objective
-
-Continue expanding the modular Image Analysis Workspace.
-
-Next planned module
-
-Morphology
-
-Possible morphology measurements
+# Morphology measurements
 
 - Area
 - Perimeter
 - Circularity
 - Solidity
 - Eccentricity
+- Major axis
+- Minor axis
+- Equivalent diameter
+- Convex area
+- Orientation
 - Bounding box
 - Centroid
+
+---
+
+# Intensity measurements
+
+- Mean intensity
+- Median intensity
+- Minimum intensity
+- Maximum intensity
+- Standard deviation
+- Integrated intensity
+
+---
+
+# Immediate objective
+
+Continue expanding the Vision Engine.
+
+Next planned module
+
+Texture Analysis
 
 ---
 
@@ -202,7 +233,15 @@ Segmentation
 
 ↓
 
-Morphological Analysis
+Morphology
+
+↓
+
+Intensity
+
+↓
+
+Texture
 
 ↓
 
@@ -232,7 +271,8 @@ Agentic AI
 
 # Technical debt
 
-- Refactor SegmentationPanel and SegmentationResults into a single SegmentationModule
+- Refactor common analysis table components
+- Generic object-selection infrastructure
 - Improve loading indicators
 - Dataset metadata viewer
 - Dataset deletion
@@ -244,8 +284,10 @@ Agentic AI
 
 # Notes
 
-The Images workspace is now designed around independent analysis modules.
+The Vision Engine currently contains three analysis modules:
 
-Segmentation is the first implemented module.
+- Segmentation
+- Morphology
+- Intensity
 
-Future image-analysis functionality should be implemented as additional modules without modifying the overall Images workspace architecture.
+Future analysis modules should follow the same modular architecture.

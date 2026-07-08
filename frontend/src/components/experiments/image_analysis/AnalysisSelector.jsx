@@ -12,6 +12,7 @@ function AnalysisSelector({ analysisType, setAnalysisType }) {
           <option value="segmentation">Segmentation</option>
           <option value="morphology">Morphology</option>
           <option value="intensity">Intensity</option>
+          <option value="texture">Texture</option>
         </select>
       </label>
     </section>

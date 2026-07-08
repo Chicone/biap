@@ -10,6 +10,30 @@ Rather than being a collection of isolated tools, BIAP is designed as a modular 
 
 The long-term goal is to develop software resembling the AI platforms used in modern pharmaceutical companies and biomedical research institutes, demonstrating how computer vision, scientific computing, and AI can be integrated into a unified research workflow.
 
+---
+
+## Current Vision Engine
+
+Implemented
+
+- Segmentation
+- Morphological analysis
+- Intensity analysis
+- Ground-truth evaluation
+- Interactive object inspection
+
+Planned
+
+- Texture analysis
+- Feature extraction
+- Classical Machine Learning
+- Deep Learning
+- Graph Neural Networks
+- Large Language Models
+- Agentic AI
+
+---
+
 ## Core Principles
 
 - Modular architecture

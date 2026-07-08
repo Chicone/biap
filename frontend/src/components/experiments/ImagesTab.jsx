@@ -17,6 +17,8 @@ import MorphologyPanel from "@/components/experiments/image_analysis/morphology/
 import MorphologyResults from "@/components/experiments/image_analysis/morphology/MorphologyResults";
 import IntensityPanel from "@/components/experiments/image_analysis/intensity/IntensityPanel";
 import IntensityResults from "@/components/experiments/image_analysis/intensity/IntensityResults";
+import TexturePanel from "@/components/experiments/image_analysis/texture/TexturePanel";
+import TextureResults from "@/components/experiments/image_analysis/texture/TextureResults";
 
 const API_URL = "http://127.0.0.1:8000";
 
@@ -157,6 +159,37 @@ function ImagesTab({ activeDataset }) {
     }
   }
 
+  async function handleAnalyzeTexture() {
+    if (!activeDataset || !selectedImage) {
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setEvaluationError(null);
+    setEvaluation(null);
+    setSelectedObjectLabel(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/images/${selectedImage.id}/texture?foreground=${foreground}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Texture analysis failed");
+      }
+
+      const result = await response.json();
+
+      setAnalysis(result);
+      setOverlayMode("prediction");
+    } catch (error) {
+      setAnalysisError("Texture analysis failed");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
   return (
     <div className="workspace-content">
       <div className="images-toolbar">
@@ -277,6 +310,27 @@ function ImagesTab({ activeDataset }) {
           />
 
           <IntensityResults
+            analysis={analysis}
+            analysisError={analysisError}
+            onSelectObject={setSelectedObjectLabel}
+          />
+        </>
+      )}
+
+      {analysisType === "texture" && (
+        <>
+          <TexturePanel
+            foreground={foreground}
+            setForeground={setForeground}
+            setAnalysis={setAnalysis}
+            setEvaluation={setEvaluation}
+            setOverlayMode={setOverlayMode}
+            setSelectedObjectLabel={setSelectedObjectLabel}
+            isAnalyzing={isAnalyzing}
+            onRunTexture={handleAnalyzeTexture}
+          />
+
+          <TextureResults
             analysis={analysis}
             analysisError={analysisError}
             onSelectObject={setSelectedObjectLabel}

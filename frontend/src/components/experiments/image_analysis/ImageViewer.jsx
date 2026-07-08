@@ -17,7 +17,8 @@ function ImageViewer({
 
     const supportsObjectSelection =
       analysisType === "morphology" ||
-      analysisType === "intensity";
+      analysisType === "intensity" ||
+      analysisType === "texture";
 
     if (supportsObjectSelection && selectedObjectLabel !== null) {
       return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/objects/${selectedObjectLabel}/overlay?foreground=${foreground}&t=${Date.now()}`;    }

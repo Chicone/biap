@@ -974,3 +974,11 @@ tbody tr:hover {
 .intensity-module + .analysis-panels .analysis-panel {
   width: 100%;
 }
+
+.texture-module + .analysis-panels {
+  grid-template-columns: 1fr;
+}
+
+.texture-module + .analysis-panels .analysis-panel {
+  width: 100%;
+}
