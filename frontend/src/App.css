@@ -982,3 +982,27 @@ tbody tr:hover {
 .texture-module + .analysis-panels .analysis-panel {
   width: 100%;
 }
+
+.morphology-module + .analysis-panels {
+  grid-template-columns: 1fr;
+}
+
+.morphology-module + .analysis-panels .analysis-panel {
+  width: 100%;
+}
+
+.segmentation-module + .analysis-panels {
+  grid-template-columns: 1fr;
+}
+
+.segmentation-module + .analysis-panels .analysis-panel {
+  width: 100%;
+}
+
+.morphology-module + .analysis-panels {
+  grid-template-columns: 1fr;
+}
+
+.morphology-module + .analysis-panels .analysis-panel {
+  width: 100%;
+}

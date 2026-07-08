@@ -272,6 +272,7 @@ function ImagesTab({ activeDataset }) {
               analysisError={analysisError}
               evaluation={evaluation}
               evaluationError={evaluationError}
+              onSelectObject={setSelectedObjectLabel}
             />
           </>
         )}

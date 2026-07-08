@@ -16,6 +16,7 @@ function ImageViewer({
     }
 
     const supportsObjectSelection =
+      analysisType === "segmentation" ||
       analysisType === "morphology" ||
       analysisType === "intensity" ||
       analysisType === "texture";

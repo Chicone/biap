@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
 function SegmentationResults({
@@ -5,7 +6,10 @@ function SegmentationResults({
   analysisError,
   evaluation,
   evaluationError,
+  onSelectObject,
 }) {
+  const [selectedObject, setSelectedObject] = useState(null);
+
   if (!analysis && !evaluation && !analysisError && !evaluationError) {
     return null;
   }
@@ -38,26 +42,70 @@ function SegmentationResults({
             </div>
           </div>
 
-          <h5>First detected objects</h5>
+          <h5>Detected objects</h5>
 
-          <div className="analysis-table">
-            <div className="analysis-row analysis-row-header">
-              <span>Object</span>
-              <span>Area</span>
-              <span>Centroid</span>
-            </div>
+          <div className="morphology-table-container">
+            <table className="morphology-table">
+              <thead>
+                <tr>
+                  <th>Object</th>
+                  <th>Area</th>
+                  <th>Centroid row</th>
+                  <th>Centroid col</th>
+                </tr>
+              </thead>
 
-            {analysis.objects.slice(0, 5).map((object) => (
-              <div className="analysis-row" key={object.label}>
-                <span>{object.label}</span>
-                <span>{object.area}</span>
-               <span>
-                ({object.centroid.row.toFixed(1)},{" "}
-                {object.centroid.col.toFixed(1)})
-              </span>
-              </div>
-            ))}
+              <tbody>
+                {analysis.objects.map((object) => (
+                  <tr
+                    key={object.label}
+                    className={
+                      selectedObject?.label === object.label
+                        ? "morphology-selected-row"
+                        : ""
+                    }
+                    onClick={() => {
+                      setSelectedObject(object);
+                      if (onSelectObject) {
+                        onSelectObject(object.label);
+                      }
+                    }}
+                  >
+                    <td>{object.label}</td>
+                    <td>{object.area.toFixed(1)}</td>
+                    <td>{object.centroid.row.toFixed(1)}</td>
+                    <td>{object.centroid.col.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+
+          {selectedObject && (
+            <div className="object-details-panel">
+              <h5>Object {selectedObject.label}</h5>
+
+              <div className="object-details-grid">
+                <span>Area</span>
+                <strong>{selectedObject.area.toFixed(1)}</strong>
+
+                <span>Perimeter</span>
+                <strong>{selectedObject.perimeter.toFixed(1)}</strong>
+
+                <span>Centroid</span>
+                <strong>
+                  ({selectedObject.centroid.row.toFixed(1)},{" "}
+                  {selectedObject.centroid.col.toFixed(1)})
+                </strong>
+
+                <span>Bounding box</span>
+                <strong>
+                  {selectedObject.bbox.min_row}, {selectedObject.bbox.min_col} →{" "}
+                  {selectedObject.bbox.max_row}, {selectedObject.bbox.max_col}
+                </strong>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
