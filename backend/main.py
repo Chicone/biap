@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 from vision.segmentation import segment_otsu
-from vision.io import load_image, pil_to_numpy
+from vision.io import load_image, pil_to_numpy, normalize_for_display
 from vision.preprocessing import to_grayscale
 from vision.segmentation import threshold, connected_components
 from vision.measurements import (
@@ -41,6 +41,27 @@ DATA_ROOT = BASE_DIR / "data" / "raw"
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 app.mount("/data", StaticFiles(directory=BASE_DIR / "data"), name="data")
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
+
+
+def resolve_image_path(image_record, image_id: int, channel: str | None = None):
+  if channel is None:
+    return DATA_ROOT / image_record["filename"]
+
+  with get_connection() as conn:
+    channel_row = conn.execute(
+      """
+      SELECT *
+      FROM image_channels
+      WHERE image_id = ?
+      AND LOWER(channel_name) = LOWER(?)
+      """,
+      (image_id, channel),
+    ).fetchone()
+
+  if channel_row is None:
+    raise HTTPException(status_code=404, detail="Channel not found")
+
+  return DATA_ROOT / dict(channel_row)["filename"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -199,6 +220,77 @@ def get_images(dataset_id: int):
         ).fetchall()
 
     return [dict(row) for row in rows]
+
+
+@app.get("/images/{image_id}/channels")
+def get_image_channels(image_id: int):
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM image_channels
+            WHERE image_id = ?
+            ORDER BY channel_order
+            """,
+            (image_id,),
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+@app.get("/datasets/{dataset_id}/images/{image_id}/preview")
+def get_image_preview(
+    dataset_id: int,
+    image_id: int,
+    channel: str | None = None,
+):
+    with get_connection() as conn:
+        image_row = conn.execute(
+            """
+            SELECT *
+            FROM images
+            WHERE dataset_id = ? AND id = ?
+            """,
+            (dataset_id, image_id),
+        ).fetchone()
+
+        if image_row is None:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        image_record = dict(image_row)
+
+        if channel is not None:
+            channel_row = conn.execute(
+                """
+                SELECT *
+                FROM image_channels
+                WHERE image_id = ?
+                AND LOWER(channel_name) = LOWER(?)
+                """,
+                (image_id, channel),
+            ).fetchone()
+
+            if channel_row is None:
+                raise HTTPException(status_code=404, detail="Channel not found")
+
+            image_path = DATA_ROOT / dict(channel_row)["filename"]
+        else:
+            image_path = DATA_ROOT / image_record["filename"]
+
+    image = load_image(image_path)
+    image_array = pil_to_numpy(image)
+
+    preview = normalize_for_display(image_array)
+
+    if preview.ndim == 3:
+        preview = preview[:, :, :3]
+
+    output = BytesIO()
+    Image.fromarray(preview).save(output, format="PNG")
+    output.seek(0)
+
+    return StreamingResponse(output, media_type="image/png")
+
 
 @app.get("/datasets/{dataset_id}/images/{image_id}/grayscale")
 def get_grayscale_info(dataset_id: int, image_id: int):
@@ -402,7 +494,12 @@ async def import_bbbc021(dataset_id: int, request: BBBC021ImportRequest):
 
 
 @app.get("/datasets/{dataset_id}/images/{image_id}/analysis")
-def analyze_image(dataset_id: int, image_id: int):
+def analyze_image(
+  dataset_id: int,
+  image_id: int,
+  foreground: str = "bright",
+  channel: str | None = None,
+):
     with get_connection() as conn:
         row = conn.execute(
             """
@@ -417,14 +514,14 @@ def analyze_image(dataset_id: int, image_id: int):
         raise HTTPException(status_code=404, detail="Image not found")
 
     image_record = dict(row)
-    image_path = DATA_ROOT / image_record["filename"]
+    image_path = resolve_image_path(image_record, image_id, channel)
     image = load_image(image_path)
     image_array = pil_to_numpy(image)
     gray = to_grayscale(image_array)
 
     binary, otsu_value = segment_otsu(
       gray,
-      foreground="bright",
+      foreground=foreground,
       return_threshold=True,
     )
 
@@ -447,6 +544,7 @@ def analyze_image_intensity(
     dataset_id: int,
     image_id: int,
     foreground: str = "bright",
+    channel: str | None = None,
 ):
     with get_connection() as conn:
         row = conn.execute(
@@ -463,7 +561,7 @@ def analyze_image_intensity(
 
     image_record = dict(row)
 
-    image_path = DATA_ROOT / image_record["filename"]
+    image_path = resolve_image_path(image_record, image_id, channel)
 
     image = load_image(image_path)
     image_array = pil_to_numpy(image)
@@ -496,6 +594,7 @@ def analyze_image_texture(
     dataset_id: int,
     image_id: int,
     foreground: str = "bright",
+    channel: str | None = None,
 ):
     with get_connection() as conn:
         row = conn.execute(
@@ -511,7 +610,7 @@ def analyze_image_texture(
         raise HTTPException(status_code=404, detail="Image not found")
 
     image_record = dict(row)
-    image_path = DATA_ROOT / image_record["filename"]
+    image_path = resolve_image_path(image_record, image_id, channel)
 
     image = load_image(image_path)
     image_array = pil_to_numpy(image)
@@ -970,6 +1069,7 @@ def get_image_overlay(
     dataset_id: int,
     image_id: int,
     foreground: str = "bright",
+    channel: str | None = None,
 ):
     with get_connection() as conn:
         row = conn.execute(
@@ -985,7 +1085,7 @@ def get_image_overlay(
         raise HTTPException(status_code=404, detail="Image not found")
 
     image_record = dict(row)
-    image_path = DATA_ROOT / image_record["filename"]
+    image_path = resolve_image_path(image_record, image_id, channel)
     image = load_image(image_path)
     image_array = pil_to_numpy(image)
 
@@ -996,10 +1096,12 @@ def get_image_overlay(
       return_threshold=True,
     )
 
-    if image_array.ndim == 2:
-        rgb_image = np.stack([image_array] * 3, axis=-1)
+    display_image = normalize_for_display(image_array)
+
+    if display_image.ndim == 2:
+        rgb_image = np.stack([display_image] * 3, axis=-1)
     else:
-        rgb_image = image_array[:, :, :3]
+        rgb_image = display_image[:, :, :3]
 
     overlay = overlay_mask(
         rgb_image,
@@ -1020,6 +1122,7 @@ def get_selected_object_overlay(
     image_id: int,
     object_label: int,
     foreground: str = "bright",
+    channel: str | None = None,
 ):
     with get_connection() as conn:
         row = conn.execute(
@@ -1035,7 +1138,7 @@ def get_selected_object_overlay(
         raise HTTPException(status_code=404, detail="Image not found")
 
     image_record = dict(row)
-    image_path = DATA_ROOT / image_record["filename"]
+    image_path = resolve_image_path(image_record, image_id, channel)
     image = load_image(image_path)
     image_array = pil_to_numpy(image)
 
@@ -1054,10 +1157,12 @@ def get_selected_object_overlay(
             detail="Object label not found",
         )
 
-    if image_array.ndim == 2:
-        rgb_image = np.stack([image_array] * 3, axis=-1)
+    display_image = normalize_for_display(image_array)
+
+    if display_image.ndim == 2:
+        rgb_image = np.stack([display_image] * 3, axis=-1)
     else:
-        rgb_image = image_array[:, :, :3]
+        rgb_image = display_image[:, :, :3]
 
     overlay = overlay_selected_label(
         rgb_image,
@@ -1125,6 +1230,7 @@ def evaluate_image(
     dataset_id: int,
     image_id: int,
     foreground: str = "bright",
+    channel: str | None = None,
 ):
     with get_connection() as conn:
         row = conn.execute(
@@ -1147,7 +1253,7 @@ def evaluate_image(
             detail="Ground truth not available for this image",
         )
 
-    image_path = DATA_ROOT / image_record["filename"]
+    image_path = resolve_image_path(image_record, image_id, channel)
     mask_dir = DATA_ROOT / image_record["ground_truth_dir"]
 
     image = load_image(image_path)

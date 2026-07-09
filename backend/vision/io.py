@@ -92,3 +92,28 @@ def image_info(image: Image.Image | np.ndarray) -> dict[str, Any]:
         "dtype": str(image.dtype),
         "ndim": image.ndim,
     }
+
+
+def normalize_for_display(array: np.ndarray) -> np.ndarray:
+  """
+  Normalize grayscale or RGB image data to uint8 for browser display.
+
+  This is especially important for 16-bit microscopy TIFF images.
+  """
+  array = np.asarray(array)
+
+  if array.dtype == np.uint8:
+    return array
+
+  array = array.astype(np.float32)
+
+  min_value = float(np.min(array))
+  max_value = float(np.max(array))
+
+  if max_value <= min_value:
+    return np.zeros(array.shape, dtype=np.uint8)
+
+  normalized = (array - min_value) / (max_value - min_value)
+  normalized = normalized * 255.0
+
+  return normalized.astype(np.uint8)

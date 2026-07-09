@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 function ImageViewer({
   activeDataset,
   selectedImage,
@@ -6,13 +8,53 @@ function ImageViewer({
   selectedObjectLabel,
   analysisType,
 }) {
+  const [channels, setChannels] = useState([]);
+  const [selectedChannel, setSelectedChannel] = useState("");
+
+  useEffect(() => {
+    setChannels([]);
+    setSelectedChannel("");
+
+    if (!selectedImage) {
+      return;
+    }
+
+    fetch(`http://127.0.0.1:8000/images/${selectedImage.id}/channels`)
+      .then((response) => response.json())
+      .then((data) => {
+        setChannels(data);
+
+        if (data.length > 0) {
+          setSelectedChannel(data[0].channel_name);
+        }
+      })
+      .catch(() => {
+        setChannels([]);
+        setSelectedChannel("");
+      });
+  }, [selectedImage]);
+
+  function buildChannelParams(extraParams = {}) {
+    const params = new URLSearchParams(extraParams);
+
+    if (selectedChannel) {
+      params.set("channel", selectedChannel);
+    }
+
+    return params.toString();
+  }
+
   function getPreviewImageUrl() {
     if (!activeDataset || !selectedImage) {
       return "";
     }
 
     if (overlayMode === "original") {
-      return `http://127.0.0.1:8000${selectedImage.url}`;
+      const query = buildChannelParams();
+
+      return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/preview${
+        query ? `?${query}` : ""
+      }`;
     }
 
     const supportsObjectSelection =
@@ -22,13 +64,21 @@ function ImageViewer({
       analysisType === "texture";
 
     if (supportsObjectSelection && selectedObjectLabel !== null) {
-      return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/objects/${selectedObjectLabel}/overlay?foreground=${foreground}&t=${Date.now()}`;    }
+      const query = buildChannelParams({
+        foreground,
+        t: String(Date.now()),
+      });
+
+      return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/objects/${selectedObjectLabel}/overlay?${query}`;
+    }
 
     if (overlayMode === "groundTruth") {
       return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/ground-truth-overlay`;
     }
 
-    return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/overlay?foreground=${foreground}`;
+    const query = buildChannelParams({ foreground });
+
+    return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/overlay?${query}`;
   }
 
   if (!selectedImage) {
@@ -52,6 +102,25 @@ function ImageViewer({
           </p>
         </div>
       </div>
+
+      {channels.length > 0 && (
+        <div className="image-channel-selector">
+          {channels.map((channel) => (
+            <button
+              key={channel.id}
+              type="button"
+              className={
+                selectedChannel === channel.channel_name
+                  ? "channel-button active"
+                  : "channel-button"
+              }
+              onClick={() => setSelectedChannel(channel.channel_name)}
+            >
+              {channel.channel_name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="image-preview-figure">
         <img

@@ -1259,3 +1259,24 @@ tbody tr:hover {
   border-radius: 8px;
   background: #ffffff;
 }
+
+.image-channel-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.channel-button {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.channel-button.active {
+  background: #334155;
+  color: white;
+}

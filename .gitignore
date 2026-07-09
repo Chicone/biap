@@ -30,3 +30,6 @@ data/raw/*
 data/processed/*
 data/external/*
 data/demo/*
+
+# SQLite database
+backend/data/biap.sqlite

@@ -41,6 +41,8 @@ function ImagesTab({ activeDataset }) {
   const [analysisType, setAnalysisType] = useState("segmentation");
 
   const [selectedObjectLabel, setSelectedObjectLabel] = useState(null);
+  const [channels, setChannels] = useState([]);
+  const [selectedChannel, setSelectedChannel] = useState("");
 
   useEffect(() => {
     async function loadImages() {
@@ -95,6 +97,7 @@ function ImagesTab({ activeDataset }) {
 
   async function handleAnalyzeImage() {
     setSelectedObjectLabel(null);
+
     if (!activeDataset || !selectedImage) {
       return;
     }
@@ -108,19 +111,27 @@ function ImagesTab({ activeDataset }) {
       const result = await analyzeImage(
         activeDataset.id,
         selectedImage.id,
-        foreground
+        foreground,
+        selectedChannel
       );
 
       setAnalysis(result);
-
-      const evaluationResult = await evaluateImage(
-        activeDataset.id,
-        selectedImage.id,
-        foreground
-      );
-
-      setEvaluation(evaluationResult);
       setOverlayMode("prediction");
+
+      if (selectedImage.ground_truth_dir) {
+        try {
+          const evaluationResult = await evaluateImage(
+            activeDataset.id,
+            selectedImage.id,
+            foreground,
+            selectedChannel
+          );
+
+          setEvaluation(evaluationResult);
+        } catch (error) {
+          setEvaluationError("Ground-truth evaluation failed");
+        }
+      }
     } catch (error) {
       setAnalysisError("Segmentation analysis failed");
     } finally {
@@ -140,8 +151,16 @@ function ImagesTab({ activeDataset }) {
     setSelectedObjectLabel(null);
 
     try {
+      const params = new URLSearchParams({
+        foreground,
+      });
+
+      if (selectedChannel) {
+        params.set("channel", selectedChannel);
+      }
+
       const response = await fetch(
-        `${API_URL}/datasets/${activeDataset.id}/images/${selectedImage.id}/intensity?foreground=${foreground}`
+        `${API_URL}/datasets/${activeDataset.id}/images/${selectedImage.id}/intensity?${params.toString()}`
       );
 
       if (!response.ok) {
@@ -171,8 +190,16 @@ function ImagesTab({ activeDataset }) {
     setSelectedObjectLabel(null);
 
     try {
+      const params = new URLSearchParams({
+        foreground,
+      });
+
+      if (selectedChannel) {
+        params.set("channel", selectedChannel);
+      }
+
       const response = await fetch(
-        `${API_URL}/datasets/${activeDataset.id}/images/${selectedImage.id}/texture?foreground=${foreground}`
+        `${API_URL}/datasets/${activeDataset.id}/images/${selectedImage.id}/texture?${params.toString()}`
       );
 
       if (!response.ok) {
@@ -237,6 +264,10 @@ function ImagesTab({ activeDataset }) {
         foreground={foreground}
         selectedObjectLabel={selectedObjectLabel}
         analysisType={analysisType}
+        channels={channels}
+        setChannels={setChannels}
+        selectedChannel={selectedChannel}
+        setSelectedChannel={setSelectedChannel}
       />
 
      {selectedImage && (
