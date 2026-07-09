@@ -1,231 +1,80 @@
 # BIAP Current State
 
-Last updated: 2026-07-07
+Last updated: 2026-07-09
 
 ---
 
 # Current milestone
 
-## Phase 2 — Computer Vision
+## Phase 3 — Feature Analysis
 
-### Image Analysis Workspace v2 completed
+Completed
 
-BIAP has evolved from a dataset browser into a modular biomedical image analysis platform.
-
-The Images workspace now supports multiple independent image analysis modules built on a common architecture.
-
----
-
-# Backend
+### Vision Engine
 
 Implemented
-
-## Dataset management
-
-- Generic dataset import
-- Folder-based image discovery
-- Dataset registration
-- Thumbnail generation
-- Image serving API
-- Static image storage
-
-## Vision Engine
-
-Current modules
-
-```text
-backend/
-    vision/
-        io.py
-        preprocessing.py
-        segmentation.py
-        measurements.py
-        visualization.py
-        ground_truth.py
-        metrics.py
-```
-
-Implemented functionality
-
-- Otsu threshold segmentation
-- Bright/Dark foreground selection
-- Connected component analysis
-- Morphological measurements
-- Intensity measurements
-- Prediction overlay generation
-- Ground-truth overlay generation
-- Selected-object overlay
-- Ground-truth mask merging
-- Segmentation evaluation
-
-Evaluation metrics
-
-- IoU
-- Dice coefficient
-- Precision
-- Recall
-
----
-
-# Frontend
-
-Implemented
-
-## Dataset Workspace
-
-- Dataset management
-- Dataset import
-- Image browsing
-- Dataset preview
-
-## Image Analysis Workspace
-
-Current architecture
-
-```text
-ImagesTab
-│
-├── ImageViewer
-├── AnalysisSelector
-├── Segmentation
-│     ├── SegmentationPanel
-│     └── SegmentationResults
-├── Morphology
-│     ├── MorphologyPanel
-│     └── MorphologyResults
-├── Intensity
-│     ├── IntensityPanel
-│     └── IntensityResults
-└── ImageBrowser
-```
-
-Implemented functionality
-
-- Full-resolution image preview
-- Scrollable thumbnail browser
-- Prediction overlays
-- Ground-truth overlays
-- Bright/Dark foreground selection
-- Automatic segmentation evaluation
-- Interactive object selection
-- Object highlighting on the original image
-- Modular analysis architecture
-
----
-
-# Supported datasets
-
-✓ Generic image folders
-
-✓ BBBC038 (Data Science Bowl)
-
-Current testing dataset
-
-BBBC038
-
----
-
-# Current capabilities
-
-The platform can
-
-- Import biomedical datasets
-- Browse microscopy images
-- Display prediction overlays
-- Display ground-truth overlays
-- Run Otsu segmentation
-- Detect connected objects
-- Perform morphology analysis
-- Perform intensity analysis
-- Highlight selected objects
-- Compare prediction against ground truth
-- Compute IoU, Dice, Precision and Recall
-
----
-
-# Current Image Analysis Architecture
-
-```text
-Image Preview
-
-↓
-
-Analysis Selector
-
-↓
-
-Selected Analysis Module
-
-↓
-
-Results
-
-↓
-
-Scrollable Image Browser
-```
-
-Currently implemented analysis
 
 - Segmentation
 - Morphology
 - Intensity
-
-Future analysis modules
-
 - Texture
-- Feature Extraction
-- Classical Machine Learning
-- Deep Learning
-- Graph-based Analysis
 
 ---
 
-# Morphology measurements
+### Feature Analysis
 
-- Area
-- Perimeter
-- Circularity
-- Solidity
-- Eccentricity
-- Major axis
-- Minor axis
-- Equivalent diameter
-- Convex area
-- Orientation
-- Bounding box
-- Centroid
+Implemented
 
----
-
-# Intensity measurements
-
-- Mean intensity
-- Median intensity
-- Minimum intensity
-- Maximum intensity
-- Standard deviation
-- Integrated intensity
+- Feature set builder
+- Feature source selection
+- Constant feature removal
+- Correlation filtering
+- Standard scaling
+- Min-Max scaling
+- Robust scaling
+- PCA
+- UMAP
+- Feature matrix viewer
+- Plotly projection viewer
+- Dynamic "Color by Feature"
 
 ---
 
-# Immediate objective
+### Projection Viewer
 
-Continue expanding the Vision Engine.
+Implemented
 
-Next planned module
-
-Texture Analysis
+- PCA projection
+- UMAP projection
+- Interactive Plotly scatter plot
+- Dynamic feature colouring
+- Hover metadata
 
 ---
 
-# Long-term pipeline
+### Dataset Import
 
-Image
+Implemented
 
-↓
+- Generic folder importer
+- BBBC038 importer
+- Initial BBBC021 metadata importer
 
-Preprocessing
+Current BBBC021 support
+
+- Metadata loading
+- Compound table
+- Mechanism-of-action table
+- Metadata merging
+
+Importer architecture is now plugin-based.
+
+---
+
+### Current pipeline
+
+```text
+Images
 
 ↓
 
@@ -245,49 +94,29 @@ Texture
 
 ↓
 
-Feature Extraction
+Feature Analysis
 
 ↓
 
-Machine Learning
+Projection Viewer
 
 ↓
 
-Deep Learning
-
-↓
-
-Graph Neural Networks
-
-↓
-
-Large Language Models
-
-↓
-
-Agentic AI
+Machine Learning (next)
+```
 
 ---
 
-# Technical debt
+# Immediate objective
 
-- Refactor common analysis table components
-- Generic object-selection infrastructure
-- Improve loading indicators
-- Dataset metadata viewer
-- Dataset deletion
-- Dataset search and filtering
-- Thumbnail caching
-- Background task execution
+Implement complete BBBC021 import.
 
----
+This includes
 
-# Notes
+- Three-channel microscopy import
+- Metadata import
+- Compound information
+- Mechanism of action labels
+- Multi-channel image representation
 
-The Vision Engine currently contains three analysis modules:
-
-- Segmentation
-- Morphology
-- Intensity
-
-Future analysis modules should follow the same modular architecture.
+The first machine-learning benchmark will use BBBC021.

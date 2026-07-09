@@ -13,7 +13,7 @@ FastAPI Backend
  ┌─────────────┬──────────────┬──────────────┬──────────────┐
  │             │              │              │
  Dataset     Vision         ML Engine      AI Engine
- Manager     Engine         (future)       (future)
+ Manager     Engine         (in progress)  (future)
         │
         ▼
  Experiment Manager
@@ -24,42 +24,32 @@ FastAPI Backend
 
 The frontend communicates exclusively through REST APIs.
 
-Each backend module is responsible for a single domain and can evolve independently.
-
 ---
 
 # Frontend Architecture
 
 ```text
-ImagesTab
+Dataset Workspace
 │
-├── ImageViewer
+├── Images
+├── Feature Analysis
+│      ├── Feature Set Builder
+│      ├── Projection Viewer
+│      ├── Feature Matrix
+│      └── Feature Set Summary
 │
-├── AnalysisSelector
-│
-├── Segmentation
-│      ├── SegmentationPanel
-│      └── SegmentationResults
-│
-├── Morphology
-│      ├── MorphologyPanel
-│      └── MorphologyResults
-│
-├── Intensity
-│      ├── IntensityPanel
-│      └── IntensityResults
-│
-└── ImageBrowser
+└── (Machine Learning - planned)
 ```
 
-Only the selected analysis module is rendered.
+Feature Analysis currently includes:
 
-Future modules
-
-- Texture
-- Feature Extraction
-- Machine Learning
-- Deep Learning
+- Feature source selection
+- Feature filtering
+- Feature transformation
+- PCA
+- UMAP
+- Interactive Plotly projection viewer
+- Feature matrix explorer
 
 ---
 
@@ -69,46 +59,70 @@ Future modules
 backend/
 │
 ├── api/
-├── datasets/
+├── dataset_importers/
+│      ├── generic.py
+│      └── bbbc021.py
+│
 ├── models/
 │
 └── vision/
-      ├── io.py
-      ├── preprocessing.py
-      ├── segmentation.py
-      ├── measurements.py
-      ├── visualization.py
-      ├── ground_truth.py
-      └── metrics.py
+       io.py
+       preprocessing.py
+       segmentation.py
+       measurements.py
+       visualization.py
+       ground_truth.py
+       metrics.py
 ```
 
-The Vision Engine is intentionally modular.
+The importer architecture is dataset-specific.
 
-Segmentation produces labelled objects.
+Each supported public dataset will eventually have its own importer implementing a common interface.
 
-Object-analysis modules (Morphology, Intensity, Texture, etc.) operate on those segmented objects.
+---
+
+# Vision Pipeline
+
+```text
+Image
+
+↓
+
+Segmentation
+
+↓
+
+Morphology
+
+↓
+
+Intensity
+
+↓
+
+Texture
+
+↓
+
+Feature Analysis
+
+↓
+
+Machine Learning
+
+↓
+
+Deep Learning
+```
 
 ---
 
 # Design Principles
 
 - Modular architecture
+- Dataset-specific importers
 - Separation of concerns
 - Experiment-driven workflows
 - Reusable analysis modules
-- Extensible AI pipeline
+- Interactive scientific visualization
 - REST-based frontend/backend communication
-
----
-
-# Long-term Vision
-
-The architecture is intentionally designed to evolve from classical image analysis toward:
-
-- Machine Learning
-- Deep Learning
-- Graph Neural Networks
-- Large Language Models
-- Agentic AI
-
-without requiring architectural redesign.

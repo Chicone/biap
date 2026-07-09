@@ -31,6 +31,7 @@ from vision.metrics import iou, dice_coefficient, precision, recall
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.decomposition import PCA
 import umap
+from dataset_importers.bbbc021 import BBBC021Importer
 
 app = FastAPI()
 init_db()
@@ -89,6 +90,11 @@ class ImageCreate(BaseModel):
 class FolderImportRequest(BaseModel):
   folder_path: str
   max_images: int = 20
+
+
+class BBBC021ImportRequest(BaseModel):
+  folder_path: str
+  max_images: int | None = None
 
 @app.get("/experiments")
 def get_experiments():
@@ -374,6 +380,26 @@ async def import_folder(dataset_id: int, request: FolderImportRequest):
         "imported": imported,
         "total_images": len(get_images(dataset_id)),
     }
+
+@app.post("/datasets/{dataset_id}/import-bbbc021")
+async def import_bbbc021(dataset_id: int, request: BBBC021ImportRequest):
+    source_folder = Path(request.folder_path)
+
+    if not source_folder.exists():
+        raise HTTPException(status_code=404, detail="BBBC021 folder not found")
+
+    importer = BBBC021Importer(source_folder)
+
+    with get_connection() as conn:
+        result = importer.import_to_database(
+            dataset_id=dataset_id,
+            data_root=DATA_ROOT,
+            conn=conn,
+            max_images=request.max_images,
+        )
+
+    return result
+
 
 @app.get("/datasets/{dataset_id}/images/{image_id}/analysis")
 def analyze_image(dataset_id: int, image_id: int):
@@ -1148,3 +1174,4 @@ def evaluate_image(
         "precision": precision(prediction, ground_truth),
         "recall": recall(prediction, ground_truth),
     }
+

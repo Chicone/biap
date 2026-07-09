@@ -1,89 +1,53 @@
----
+## 2026-07-09
 
-## 2026-07-06
+### Feature Analysis Workspace
 
-### Modular Image Analysis Architecture
+Feature Engineering has evolved into a broader Feature Analysis workspace.
 
-The Images workspace has been redesigned around independent analysis modules.
+The workspace now includes:
 
-Instead of embedding all functionality inside ImagesTab, each image analysis technique owns its own user interface and results.
+- Feature construction
+- Feature filtering
+- Feature transformation
+- Dimensionality reduction
+- Projection visualization
+- Feature matrix exploration
 
-Current implementation:
-
-- SegmentationPanel
-- SegmentationResults
-
-Future modules will follow the same pattern:
-
-- Morphology
-- Texture
-- Intensity
-- Feature Extraction
-- Deep Learning
-
-Reason:
-
-This architecture allows new analysis techniques to be added without modifying the overall Images workspace.
-
-ImagesTab is responsible only for:
-
-- image selection
-- analysis selection
-- rendering the currently selected analysis module
-
-This significantly improves maintainability and scalability.
+This architecture leaves room for future additions such as feature statistics, clustering and feature importance.
 
 ---
 
-## 2026-07-07
+### Projection Viewer
 
-### Object Analysis Modules
+Instead of separate PCA and UMAP viewers, BIAP now provides a generic Projection Viewer.
 
-Morphology and Intensity are implemented as independent object-analysis modules.
+Current projections
 
-Each module consists of:
+- PCA
+- UMAP
 
-- backend endpoint
-- analysis panel
-- results panel
+Future projections
 
-Shared interaction pattern:
+- t-SNE
 
-- scrollable results table
-- object details panel
-- object selection
-- selected object highlighted on the original image
-
-Future object-analysis modules should reuse the same interaction model.
+Projection visualisation is independent from the underlying dimensionality reduction algorithm.
 
 ---
 
-### Vision Engine Pipeline
+### Dataset Importers
 
-Segmentation is the foundation of the Vision Engine.
+Dataset import has been redesigned around importer plugins.
 
-Object-analysis modules operate on segmented objects rather than directly on raw images.
+Each public dataset will implement its own importer.
 
-Current pipeline:
+Current importers
 
-Image
+- Generic
+- BBBC021
 
-↓
+Future importers
 
-Segmentation
-
-↓
-
-Morphology
-
-↓
-
-Intensity
-
-↓
-
-Texture (future)
-
-↓
-
-Feature Extraction (future)
+- BBBC038
+- MoNuSeg
+- PanNuke
+- Cell Painting

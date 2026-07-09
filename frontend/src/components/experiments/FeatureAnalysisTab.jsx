@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import FeatureMatrixTable from "@/components/experiments/feature_engineering/FeatureMatrixTable";
-import FeatureSetCard from "@/components/experiments/feature_engineering/FeatureSetCard";
-import FeatureBuilderSection from "@/components/experiments/feature_engineering/FeatureBuilderSection";
-import FeatureScatterPlot from "@/components/experiments/feature_engineering/FeatureScatterPlot";
+import FeatureMatrixTable from "@/components/experiments/feature_analysis/FeatureMatrixTable";
+import FeatureSetCard from "@/components/experiments/feature_analysis/FeatureSetCard";
+import FeatureBuilderSection from "@/components/experiments/feature_analysis/FeatureBuilderSection";
+import FeatureScatterPlot from "@/components/experiments/feature_analysis/FeatureScatterPlot";
 
 const API_URL = "http://127.0.0.1:8000";
 
-function FeatureEngineeringTab({ activeDataset }) {
+function FeatureAnalysisTab({ activeDataset }) {
   const [featureSetName, setFeatureSetName] = useState("Cell Features v1");
   const [selectedSources, setSelectedSources] = useState({
     morphology: true,
@@ -104,7 +104,7 @@ function FeatureEngineeringTab({ activeDataset }) {
 
   return (
     <div className="workspace-content">
-      <div className="feature-engineering-layout">
+      <div className="feature-analysis-layout">
         <section className="feature-builder-panel">
           <div className="section-label">Feature Set Builder</div>
 
@@ -422,4 +422,4 @@ function FeatureEngineeringTab({ activeDataset }) {
   );
 }
 
-export default FeatureEngineeringTab;
+export default FeatureAnalysisTab;

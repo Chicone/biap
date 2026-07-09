@@ -46,9 +46,31 @@ def init_db():
             )
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS image_channels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                image_id INTEGER NOT NULL,
+                channel_name TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                url TEXT NOT NULL,
+                channel_order INTEGER,
+                FOREIGN KEY(image_id) REFERENCES images(id)
+            )
+        """)
+
         add_column_if_missing(
           conn,
           "images",
           "ground_truth_dir",
           "ground_truth_dir TEXT",
         )
+
+        add_column_if_missing(conn, "images", "plate", "plate TEXT")
+        add_column_if_missing(conn, "images", "well", "well TEXT")
+        add_column_if_missing(conn, "images", "replicate", "replicate INTEGER")
+
+        add_column_if_missing(conn, "images", "compound", "compound TEXT")
+        add_column_if_missing(conn, "images", "concentration", "concentration REAL")
+        add_column_if_missing(conn, "images", "moa", "moa TEXT")
+        add_column_if_missing(conn, "images", "smiles", "smiles TEXT")
+

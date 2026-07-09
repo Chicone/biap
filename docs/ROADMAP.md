@@ -1,43 +1,64 @@
 # BIAP Development Roadmap
 
 ## Phase 1
+
 Biomedical Image Explorer
 
-- Dataset management
-- Image viewer
-- Metadata inspection
-- Experiment creation
+Completed
 
 ---
 
 ## Phase 2
+
 Computer Vision
 
 Completed
 
-- Image preprocessing
-- Cell segmentation
-- Morphological analysis
-- Intensity analysis
-
-Next
-
-- Texture analysis
-- Feature extraction
+- Segmentation
+- Morphology
+- Intensity
+- Texture
 
 ---
 
 ## Phase 3
-Classical Machine Learning
 
-- Feature engineering
-- Classification
-- Regression
-- Model evaluation
+Feature Analysis
+
+Completed
+
+- Feature sets
+- Feature filtering
+- Scaling
+- PCA
+- UMAP
+- Projection Viewer
+- Feature matrix
+
+Remaining
+
+- Feature statistics
+- Export feature sets
 
 ---
 
 ## Phase 4
+
+Classical Machine Learning
+
+Next
+
+- BBBC021 importer
+- Multi-channel microscopy support
+- Model training
+- Model evaluation
+- Cross-validation
+- Explainability
+
+---
+
+## Phase 5
+
 Deep Learning
 
 - CNN models
@@ -46,29 +67,29 @@ Deep Learning
 
 ---
 
-## Phase 5
+## Phase 6
+
 Graph Neural Networks
 
-- Cell graph construction
+- Cell graphs
 - Graph embeddings
-- Tissue and phenotype prediction
-
----
-
-## Phase 6
-Large Language Models
-
-- Scientific report generation
-- Literature retrieval
-- Experiment interpretation
-- Interactive AI assistant
+- Tissue analysis
 
 ---
 
 ## Phase 7
+
+Large Language Models
+
+- Scientific reporting
+- Literature integration
+- AI-assisted interpretation
+
+---
+
+## Phase 8
+
 Agentic AI
 
-- Tool orchestration
-- Autonomous experiment analysis
-- Multi-step reasoning
-- Scientific workflow automation
+- Autonomous workflows
+- Multi-agent orchestration

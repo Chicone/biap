@@ -1007,7 +1007,7 @@ tbody tr:hover {
   width: 100%;
 }
 
-.feature-engineering-layout {
+.feature-analysis-layout {
   display: grid;
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
   gap: 20px;
@@ -1093,7 +1093,7 @@ tbody tr:hover {
 }
 
 @media (max-width: 900px) {
-  .feature-engineering-layout {
+  .feature-analysis-layout {
     grid-template-columns: 1fr;
   }
 }
@@ -1142,7 +1142,7 @@ tbody tr:hover {
 }
 
 .feature-summary-panel,
-.feature-engineering-layout .analysis-panel {
+.feature-analysis-layout .analysis-panel {
   align-self: start;
 }
 
@@ -1182,11 +1182,11 @@ tbody tr:hover {
   margin-bottom: 0;
 }
 
-.feature-engineering-intro {
+.feature-analysis-intro {
   margin-bottom: 20px;
 }
 
-.feature-engineering-intro p {
+.feature-analysis-intro p {
   margin: 0;
   color: #64748b;
 }
