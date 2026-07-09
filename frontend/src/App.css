@@ -1006,3 +1006,256 @@ tbody tr:hover {
 .morphology-module + .analysis-panels .analysis-panel {
   width: 100%;
 }
+
+.feature-engineering-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.feature-builder-panel,
+.feature-summary-panel {
+  min-width: 0;
+  align-self: start;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.feature-builder-field input {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.feature-source-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.feature-source-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+}
+
+.feature-source-option input {
+  width: 16px;
+  height: 16px;
+}
+
+.feature-source-option div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.feature-source-option strong {
+  color: #0f172a;
+}
+
+.feature-source-option span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.feature-breakdown {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.feature-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.feature-breakdown-total {
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9 !important;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .feature-engineering-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.feature-matrix-panel {
+  margin-top: 24px;
+}
+
+.feature-matrix-info {
+  margin: 10px 0 16px;
+  color: #64748b;
+}
+
+.feature-matrix-container {
+  width: 100%;
+  max-width: 100%;
+  max-height: 600px;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.feature-matrix-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  z-index: 2;
+}
+
+.feature-matrix-table th,
+.feature-matrix-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.feature-matrix-table th {
+  background: #f8fafc;
+}
+
+.feature-matrix-actions {
+    margin-top: 24px;
+    margin-bottom: 20px;
+}
+
+.feature-summary-panel,
+.feature-engineering-layout .analysis-panel {
+  align-self: start;
+}
+
+.feature-set-action-button {
+  margin-top: 16px;
+}
+
+.feature-source-list + .feature-source-list {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.feature-builder-section {
+  margin-bottom: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.feature-builder-section summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.feature-builder-section-content {
+  padding: 0 14px 14px;
+}
+
+.feature-builder-section .feature-source-list {
+  margin-bottom: 0;
+}
+
+.feature-engineering-intro {
+  margin-bottom: 20px;
+}
+
+.feature-engineering-intro p {
+  margin: 0;
+  color: #64748b;
+}
+
+.feature-summary-value {
+  font-size: 1.8rem;
+  line-height: 1.1;
+}
+
+.feature-summary-text-value {
+  font-size: 1.45rem;
+  overflow-wrap: anywhere;
+}
+
+.feature-warning {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feature-pca-breakdown {
+  margin-top: 18px;
+}
+
+.feature-breakdown-heading {
+  padding: 8px 0 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.feature-plot-panel {
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.feature-plot-panel .analysis-header {
+  margin-bottom: 12px;
+}
+
+.feature-plot-panel .analysis-header p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.feature-plot-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.feature-plot-control select {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+}

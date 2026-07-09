@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import ImagesTab from "@/components/experiments/ImagesTab";
+import FeatureEngineeringTab from "@/components/experiments/FeatureEngineeringTab";
 import {
   Card,
   CardContent,
@@ -46,6 +47,7 @@ function DatasetWorkspacePage() {
             <TabsTrigger value="images">Images</TabsTrigger>
             <TabsTrigger value="annotations">Annotations</TabsTrigger>
             <TabsTrigger value="preprocessing">Preprocessing</TabsTrigger>
+            <TabsTrigger value="feature-engineering">Feature Engineering</TabsTrigger>
             <TabsTrigger value="statistics">Statistics</TabsTrigger>
           </TabsList>
 
@@ -59,6 +61,10 @@ function DatasetWorkspacePage() {
 
           <TabsContent value="preprocessing">
             Preprocessing workspace coming soon.
+          </TabsContent>
+
+          <TabsContent value="feature-engineering">
+            <FeatureEngineeringTab activeDataset={activeDataset} />
           </TabsContent>
 
           <TabsContent value="statistics">
