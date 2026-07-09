@@ -45,17 +45,28 @@ export async function uploadImage(datasetId, file) {
   return response.json();
 }
 
-export async function importFolder(datasetId, folderPath) {
+export async function importFolder(datasetId, folderPath, datasetType = "Generic") {
+  const importerEndpoint =
+    datasetType === "BBBC021"
+      ? "import-bbbc021"
+      : "import-folder";
+
+  const requestBody = {
+    folder_path: folderPath,
+  };
+
+  if (datasetType === "BBBC021") {
+    requestBody.max_images = null;
+  }
+
   const response = await fetch(
-    `${API_URL}/datasets/${datasetId}/import-folder`,
+    `${API_URL}/datasets/${datasetId}/${importerEndpoint}`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        folder_path: folderPath,
-      }),
+      body: JSON.stringify(requestBody),
     }
   );
 

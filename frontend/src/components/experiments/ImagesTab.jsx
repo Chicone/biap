@@ -75,7 +75,11 @@ function ImagesTab({ activeDataset }) {
       return;
     }
 
-    await importFolder(activeDataset.id, folderPath);
+    await importFolder(
+      activeDataset.id,
+      folderPath,
+      activeDataset.dataset_type
+    );
 
     const updatedImages = await getImages(activeDataset.id);
     setImages(updatedImages);
