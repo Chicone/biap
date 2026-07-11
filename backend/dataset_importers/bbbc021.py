@@ -2,6 +2,7 @@ from pathlib import Path
 import shutil
 import pandas as pd
 from PIL import Image
+import re
 
 
 class BBBC021Importer:
@@ -153,15 +154,16 @@ class BBBC021Importer:
         plate_column = self._first_existing_column(
             row.to_frame().T,
             [
+                "Image_Metadata_Plate_DAPI",
                 "Image_Metadata_Plate",
                 "Metadata_Plate",
-                "Image_Metadata_Plate_DAPI",
             ],
         )
 
         well_column = self._first_existing_column(
             row.to_frame().T,
             [
+                "Image_Metadata_Well_DAPI",
                 "Image_Metadata_Well",
                 "Metadata_Well",
             ],
@@ -170,10 +172,11 @@ class BBBC021Importer:
         replicate_column = self._first_existing_column(
             row.to_frame().T,
             [
-                "Image_Metadata_Replicate",
-                "Metadata_Replicate",
+                "Image_Metadata_Site_DAPI",
                 "Image_Metadata_Site",
                 "Metadata_Site",
+                "Image_Metadata_Replicate",
+                "Metadata_Replicate",
             ],
         )
 
@@ -201,14 +204,76 @@ class BBBC021Importer:
             ],
         )
 
+        well = (
+            self._clean_value(row.get(well_column))
+            if well_column
+            else None
+        )
+
+        replicate = (
+            int(row.get(replicate_column))
+            if (
+                replicate_column
+                and not pd.isna(row.get(replicate_column))
+            )
+            else None
+        )
+
+        dapi_filename_column = self._first_existing_column(
+            row.to_frame().T,
+            [
+                "Image_FileName_DAPI",
+                "FileName_DAPI",
+            ],
+        )
+
+        dapi_filename = (
+            self._clean_value(row.get(dapi_filename_column))
+            if dapi_filename_column
+            else None
+        )
+
+        if dapi_filename:
+            filename_match = re.search(
+                r"_([A-P]\d{2})_s(\d+)_w\d",
+                dapi_filename,
+                flags=re.IGNORECASE,
+            )
+
+            if filename_match:
+                if not well:
+                    well = filename_match.group(1).upper()
+
+                if replicate is None:
+                    replicate = int(filename_match.group(2))
+
         return {
-            "plate": self._clean_value(row.get(plate_column)) if plate_column else None,
-            "well": self._clean_value(row.get(well_column)) if well_column else None,
-            "replicate": int(row.get(replicate_column)) if replicate_column and not pd.isna(row.get(replicate_column)) else None,
-            "compound": self._clean_value(row.get(compound_column)) if compound_column else None,
-            "concentration": float(row.get(concentration_column)) if concentration_column and not pd.isna(row.get(concentration_column)) else None,
+            "plate": (
+                self._clean_value(row.get(plate_column))
+                if plate_column
+                else None
+            ),
+            "well": well,
+            "replicate": replicate,
+            "compound": (
+                self._clean_value(row.get(compound_column))
+                if compound_column
+                else None
+            ),
+            "concentration": (
+                float(row.get(concentration_column))
+                if (
+                    concentration_column
+                    and not pd.isna(row.get(concentration_column))
+                )
+                else None
+            ),
             "moa": self._clean_value(row.get("moa")),
-            "smiles": self._clean_value(row.get(smiles_column)) if smiles_column else None,
+            "smiles": (
+                self._clean_value(row.get(smiles_column))
+                if smiles_column
+                else None
+            ),
         }
 
     def _copy_channel(self, row, channel_key, dataset_dir):

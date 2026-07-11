@@ -45,9 +45,15 @@ export async function uploadImage(datasetId, file) {
   return response.json();
 }
 
-export async function importFolder(datasetId, folderPath, datasetType = "Generic") {
+export async function importFolder(
+  datasetId,
+  folderPath,
+  datasetName = ""
+) {
+  const normalizedDatasetName = datasetName.trim().toUpperCase();
+
   const importerEndpoint =
-    datasetType === "BBBC021"
+    normalizedDatasetName === "BBBC021"
       ? "import-bbbc021"
       : "import-folder";
 
@@ -55,7 +61,7 @@ export async function importFolder(datasetId, folderPath, datasetType = "Generic
     folder_path: folderPath,
   };
 
-  if (datasetType === "BBBC021") {
+  if (normalizedDatasetName === "BBBC021") {
     requestBody.max_images = null;
   }
 
@@ -71,7 +77,13 @@ export async function importFolder(datasetId, folderPath, datasetType = "Generic
   );
 
   if (!response.ok) {
-    throw new Error("Failed to import folder");
+    const error = await response.json().catch(() => null);
+
+    throw new Error(
+      typeof error?.detail === "string"
+        ? error.detail
+        : "Failed to import folder"
+    );
   }
 
   return response.json();

@@ -1280,3 +1280,445 @@ tbody tr:hover {
   background: #334155;
   color: white;
 }
+
+.machine-learning-tab {
+  max-width: 100%;
+}
+
+.workspace-header {
+  margin-bottom: 1.5rem;
+}
+
+.workspace-header h3 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.workspace-header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.ml-config-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(420px, 1.4fr);
+  gap: 1.25rem;
+}
+
+.ml-card {
+  padding: 1.25rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 1rem;
+  background: #ffffff;
+}
+
+.ml-card h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ml-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ml-option-list label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ml-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ml-field span {
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.ml-field input,
+.ml-field select {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  background: white;
+}
+
+.ml-field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  align-items: end;
+}
+
+.ml-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.75rem;
+}
+
+@media (max-width: 800px) {
+  .ml-config-grid,
+  .ml-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ml-card:nth-child(1),
+.ml-card:nth-child(2) {
+  min-height: 150px;
+}
+
+.ml-card:nth-child(3),
+.ml-card:nth-child(4) {
+  min-height: 170px;
+}
+
+.ml-results-card {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 1rem;
+  background: #ffffff;
+}
+
+.ml-results-card.error {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.ml-results-card h4 {
+  margin: 0 0 1rem 0;
+}
+
+.ml-results-card h5 {
+  margin: 1.25rem 0 0.75rem 0;
+}
+
+.ml-results-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ml-results-grid div {
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+}
+
+.ml-results-grid span {
+  display: block;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.ml-results-grid strong {
+  font-size: 1.25rem;
+}
+
+.ml-results-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ml-results-table th,
+.ml-results-table td {
+  padding: 0.6rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.ml-cache-card {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 1rem;
+  background: #f8fafc;
+}
+
+.ml-cache-card h4 {
+  margin: 0 0 0.5rem 0;
+}
+
+.ml-cache-card p {
+  margin: 0 0 0.75rem 0;
+}
+
+.ml-cache-card progress {
+  width: 100%;
+  height: 0.75rem;
+}
+
+.ml-cache-card small {
+  display: block;
+  margin-top: 0.75rem;
+  color: #64748b;
+}
+
+.ml-training-status {
+  margin: 1rem 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.ml-confusion-matrix {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.ml-confusion-matrix th,
+.ml-confusion-matrix td {
+  padding: 0.6rem;
+  border: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.ml-confusion-matrix th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.ml-confusion-matrix tbody th {
+  text-align: left;
+}
+
+.ml-confusion-options {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.5rem 0 1rem;
+}
+
+.ml-confusion-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.ml-confusion-options {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.9rem;
+}
+
+.ml-confusion-options > span {
+  font-weight: 600;
+  color: #475569;
+}
+
+.ml-confusion-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.ml-confusion-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.ml-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.ml-field input[type="number"] {
+    width: 80px;
+}
+
+.ml-confusion-cell {
+  cursor: pointer;
+}
+
+.ml-confusion-cell:hover {
+  background: #eef2ff;
+}
+
+.ml-confusion-detail {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+}
+
+.ml-misclassified-thumbnail {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  border: 1px solid #dbe3ef;
+  border-radius: 0.5rem;
+  background: #020617;
+}
+
+.ml-thumbnail-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ml-thumbnail-button:hover .ml-misclassified-thumbnail {
+  border-color: #2563eb;
+}
+
+.ml-selected-prediction-preview {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #dbe3ef;
+}
+
+.ml-selected-prediction-preview h5 {
+  margin: 0 0 0.25rem 0;
+}
+
+.ml-selected-prediction-preview p {
+  margin: 0 0 0.75rem 0;
+  color: #64748b;
+}
+
+.ml-selected-prediction-image {
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  border: 1px solid #dbe3ef;
+  border-radius: 0.75rem;
+  background: #020617;
+}
+
+.ml-thumbnail-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ml-compare-button,
+.ml-clear-comparison-button {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: white;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.ml-compare-button:hover,
+.ml-clear-comparison-button:hover {
+  background: #f1f5f9;
+}
+
+.ml-comparison-panel {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #dbe3ef;
+}
+
+.ml-comparison-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.ml-comparison-header h5 {
+  margin: 0;
+}
+
+.ml-comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.ml-comparison-slot {
+  border: 1px solid #dbe3ef;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: white;
+}
+
+.ml-comparison-slot h6 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.ml-comparison-slot p {
+  margin: 0 0 0.75rem 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.ml-comparison-image {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border: 1px solid #dbe3ef;
+  border-radius: 0.75rem;
+  background: #020617;
+}
+
+.ml-confusion-image-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 1rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 0.75rem;
+}
+
+.ml-confusion-image-list .ml-results-table {
+  margin: 0;
+}
+
+.ml-comparison-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  position: sticky;
+  top: 1rem;
+  z-index: 2;
+}
+
+.dataset-workspace-wide {
+  width: min(96vw, 1800px);
+  max-width: none;
+  margin: 0 auto;
+}
+
+.ml-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.ml-evaluation-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ml-evaluation-note {
+  display: block;
+  color: #64748b;
+  line-height: 1.4;
+}

@@ -32,6 +32,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.decomposition import PCA
 import umap
 from dataset_importers.bbbc021 import BBBC021Importer
+from ml.trainer import train_model
 
 app = FastAPI()
 init_db()
@@ -112,10 +113,18 @@ class FolderImportRequest(BaseModel):
   folder_path: str
   max_images: int = 20
 
-
 class BBBC021ImportRequest(BaseModel):
   folder_path: str
   max_images: int | None = None
+
+
+class MachineLearningTrainRequest(BaseModel):
+  target: str
+  algorithm: str
+  features: dict
+  cv_strategy: str = "stratified"
+  cv_folds: int
+  random_seed: int
 
 @app.get("/experiments")
 def get_experiments():
@@ -175,6 +184,28 @@ def get_datasets(experiment_id: int):
         ).fetchall()
 
     return [dict(row) for row in rows]
+
+
+@app.get("/datasets/{dataset_id}")
+def get_dataset(dataset_id: int):
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found",
+        )
+
+    return dict(row)
+
 
 @app.post("/experiments/{experiment_id}/datasets")
 def create_dataset(experiment_id: int, dataset: DatasetCreate):
@@ -492,6 +523,63 @@ async def import_bbbc021(dataset_id: int, request: BBBC021ImportRequest):
 
     return result
 
+@app.get("/datasets/{dataset_id}/machine-learning/cache-status")
+def get_machine_learning_cache_status(
+    dataset_id: int,
+    channel: str | None = None,
+    foreground: str = "bright",
+    aggregation_level: str = "image",
+):
+    with get_connection() as conn:
+        total_images = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM images
+            WHERE dataset_id = ?
+            AND moa IS NOT NULL
+            """,
+            (dataset_id,),
+        ).fetchone()[0]
+
+        cached_images = conn.execute(
+            """
+            SELECT COUNT(DISTINCT images.id)
+            FROM images
+            JOIN image_feature_cache
+            ON image_feature_cache.image_id = images.id
+            WHERE images.dataset_id = ?
+            AND images.moa IS NOT NULL
+            AND COALESCE(image_feature_cache.channel_name, '') = COALESCE(?, '')
+            AND image_feature_cache.foreground = ?
+            AND image_feature_cache.aggregation_level = ?
+            """,
+            (
+                dataset_id,
+                channel,
+                foreground,
+                aggregation_level,
+            ),
+        ).fetchone()[0]
+
+    return {
+        "dataset_id": dataset_id,
+        "total_images": total_images,
+        "cached_images": cached_images,
+        "missing_images": total_images - cached_images,
+        "complete": cached_images == total_images and total_images > 0,
+    }
+
+@app.post("/datasets/{dataset_id}/machine-learning/train")
+def train_machine_learning_model(
+    dataset_id: int,
+    request: MachineLearningTrainRequest,
+):
+    config = request.model_dump()
+
+    return train_model(
+        dataset_id=dataset_id,
+        config=config,
+    )
 
 @app.get("/datasets/{dataset_id}/images/{image_id}/analysis")
 def analyze_image(
@@ -1281,3 +1369,57 @@ def evaluate_image(
         "recall": recall(prediction, ground_truth),
     }
 
+
+@app.delete("/datasets/{dataset_id}")
+def delete_dataset(dataset_id: int):
+    with get_connection() as conn:
+        image_rows = conn.execute(
+            """
+            SELECT id
+            FROM images
+            WHERE dataset_id = ?
+            """,
+            (dataset_id,),
+        ).fetchall()
+
+        image_ids = [row["id"] for row in image_rows]
+
+        if image_ids:
+            placeholders = ",".join("?" for _ in image_ids)
+
+            conn.execute(
+                f"""
+                DELETE FROM image_feature_cache
+                WHERE image_id IN ({placeholders})
+                """,
+                image_ids,
+            )
+
+            conn.execute(
+                f"""
+                DELETE FROM image_channels
+                WHERE image_id IN ({placeholders})
+                """,
+                image_ids,
+            )
+
+        conn.execute(
+            """
+            DELETE FROM images
+            WHERE dataset_id = ?
+            """,
+            (dataset_id,),
+        )
+
+        conn.execute(
+            """
+            DELETE FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        )
+
+    return {
+        "dataset_id": dataset_id,
+        "status": "deleted",
+    }
