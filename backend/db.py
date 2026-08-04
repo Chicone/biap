@@ -79,6 +79,32 @@ def init_db():
             )
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS feature_sets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                configuration_json TEXT NOT NULL,
+                feature_names_json TEXT NOT NULL,
+                num_rows INTEGER NOT NULL DEFAULT 0,
+                num_features INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(dataset_id) REFERENCES datasets(id)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS feature_set_rows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                feature_set_id INTEGER NOT NULL,
+                image_id INTEGER NOT NULL,
+                object_label INTEGER,
+                features_json TEXT NOT NULL,
+                FOREIGN KEY(feature_set_id) REFERENCES feature_sets(id),
+                FOREIGN KEY(image_id) REFERENCES images(id)
+            )
+        """)
+
         add_column_if_missing(
           conn,
           "images",

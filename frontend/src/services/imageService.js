@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "http://127.0.0.1:8002";
 
 export async function getImages(datasetId) {
   const response = await fetch(`${API_URL}/datasets/${datasetId}/images`);

@@ -20,7 +20,7 @@ import IntensityResults from "@/components/experiments/image_analysis/intensity/
 import TexturePanel from "@/components/experiments/image_analysis/texture/TexturePanel";
 import TextureResults from "@/components/experiments/image_analysis/texture/TextureResults";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "http://127.0.0.1:8002";
 
 function ImagesTab({ activeDataset }) {
   const [images, setImages] = useState([]);

@@ -19,7 +19,7 @@ function ImageViewer({
       return;
     }
 
-    fetch(`http://127.0.0.1:8000/images/${selectedImage.id}/channels`)
+    fetch(`http://127.0.0.1:8002/images/${selectedImage.id}/channels`)
       .then((response) => response.json())
       .then((data) => {
         setChannels(data);
@@ -52,7 +52,7 @@ function ImageViewer({
     if (overlayMode === "original") {
       const query = buildChannelParams();
 
-      return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/preview${
+      return `http://127.0.0.1:8002/datasets/${activeDataset.id}/images/${selectedImage.id}/preview${
         query ? `?${query}` : ""
       }`;
     }
@@ -69,16 +69,16 @@ function ImageViewer({
         t: String(Date.now()),
       });
 
-      return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/objects/${selectedObjectLabel}/overlay?${query}`;
+      return `http://127.0.0.1:8002/datasets/${activeDataset.id}/images/${selectedImage.id}/objects/${selectedObjectLabel}/overlay?${query}`;
     }
 
     if (overlayMode === "groundTruth") {
-      return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/ground-truth-overlay`;
+      return `http://127.0.0.1:8002/datasets/${activeDataset.id}/images/${selectedImage.id}/ground-truth-overlay`;
     }
 
     const query = buildChannelParams({ foreground });
 
-    return `http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedImage.id}/overlay?${query}`;
+    return `http://127.0.0.1:8002/datasets/${activeDataset.id}/images/${selectedImage.id}/overlay?${query}`;
   }
 
   if (!selectedImage) {

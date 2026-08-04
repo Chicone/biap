@@ -5,7 +5,7 @@ import FeatureSetCard from "@/components/experiments/feature_analysis/FeatureSet
 import FeatureBuilderSection from "@/components/experiments/feature_analysis/FeatureBuilderSection";
 import FeatureScatterPlot from "@/components/experiments/feature_analysis/FeatureScatterPlot";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "http://127.0.0.1:8002";
 
 function FeatureAnalysisTab({ activeDataset }) {
   const [featureSetName, setFeatureSetName] = useState("Cell Features v1");
@@ -56,30 +56,72 @@ function FeatureAnalysisTab({ activeDataset }) {
     setBuildError(null);
     setFeatureSet(null);
 
-    const params = new URLSearchParams({
-      morphology: selectedSources.morphology,
-      intensity: selectedSources.intensity,
-      texture: selectedSources.texture,
-      foreground: "bright",
-      remove_constant: removeConstantFeatures,
-      remove_correlated: removeCorrelatedFeatures,
-      correlation_threshold: correlationThreshold,
-      scaling: scalingMethod,
-      pca_components: pcaComponents,
-      pca_mode: pcaMode,
-      umap_components: umapComponents,
-      umap_mode: umapMode,
-    });
+    const response = await fetch(
+      `${API_URL}/datasets/${activeDataset.id}/feature-sets`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: featureSetName.trim(),
+
+          morphology: selectedSources.morphology,
+          intensity: selectedSources.intensity,
+          texture: selectedSources.texture,
+
+          foreground: "bright",
+
+          remove_constant: removeConstantFeatures,
+          remove_correlated: removeCorrelatedFeatures,
+          correlation_threshold: correlationThreshold,
+
+          scaling: scalingMethod,
+
+          pca_components: pcaComponents,
+          pca_mode: pcaMode,
+
+          umap_components: umapComponents,
+          umap_mode: umapMode,
+        }),
+      }
+    );
 
     try {
       const response = await fetch(
-        `${API_URL}/datasets/${activeDataset.id}/features?${params.toString()}`
+        `${API_URL}/datasets/${activeDataset.id}/feature-sets`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: featureSetName.trim(),
+            morphology: selectedSources.morphology,
+            intensity: selectedSources.intensity,
+            texture: selectedSources.texture,
+            foreground: "bright",
+            remove_constant: removeConstantFeatures,
+            remove_correlated: removeCorrelatedFeatures,
+            correlation_threshold: correlationThreshold,
+            scaling: scalingMethod,
+            pca_components: pcaComponents,
+            pca_mode: pcaMode,
+            umap_components: umapComponents,
+            umap_mode: umapMode,
+          }),
+        }
       );
 
       if (!response.ok) {
-        throw new Error("Feature set creation failed");
-      }
+        const errorResult = await response.json().catch(() => null);
 
+        throw new Error(
+          typeof errorResult?.detail === "string"
+            ? errorResult.detail
+            : "Feature set creation failed"
+        );
+      }
       const result = await response.json();
 
       setFeatureSet({
@@ -88,7 +130,7 @@ function FeatureAnalysisTab({ activeDataset }) {
       });
       setShowMatrix(false);
     } catch (error) {
-      setBuildError("Feature set creation failed");
+      setBuildError(error.message);
     } finally {
       setIsBuilding(false);
     }

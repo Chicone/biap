@@ -2,8 +2,12 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 function MachineLearningTab({ activeDataset }) {
+  const API_URL = "http://127.0.0.1:8002";
   const [target, setTarget] = useState("moa");
   const [algorithm, setAlgorithm] = useState("random_forest");
+  const [featureSets, setFeatureSets] = useState([]);
+  const [selectedFeatureSetId, setSelectedFeatureSetId] = useState("");
+  const [featureSetsError, setFeatureSetsError] = useState(null);
   const [cvStrategy, setCvStrategy] = useState("stratified");
   const [cvFolds, setCvFolds] = useState(5);
   const [randomSeed, setRandomSeed] = useState(42);
@@ -20,6 +24,45 @@ function MachineLearningTab({ activeDataset }) {
   const [comparisonA, setComparisonA] = useState(null);
   const [comparisonB, setComparisonB] = useState(null);
 
+  async function loadFeatureSets() {
+    if (!activeDataset) {
+      return;
+    }
+
+    setFeatureSetsError(null);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8002/datasets/${activeDataset.id}/feature-sets`
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Failed to load feature sets"
+        );
+      }
+
+      setFeatureSets(result);
+
+      setSelectedFeatureSetId((currentId) => {
+        if (currentId) {
+          return currentId;
+        }
+
+        return result.length > 0
+          ? String(result[0].id)
+          : "";
+      });
+    } catch (error) {
+      setFeatureSetsError(error.message);
+      setFeatureSets([]);
+      setSelectedFeatureSetId("");
+    }
+  }
 
   async function loadCacheStatus() {
     if (!activeDataset) {
@@ -27,7 +70,7 @@ function MachineLearningTab({ activeDataset }) {
     }
 
     const response = await fetch(
-      `http://127.0.0.1:8000/datasets/${activeDataset.id}/machine-learning/cache-status?foreground=bright&aggregation_level=image`
+      `${API_URL}/datasets/${activeDataset.id}/feature-sets`
     );
 
     if (!response.ok) {
@@ -39,6 +82,7 @@ function MachineLearningTab({ activeDataset }) {
   }
 
   useEffect(() => {
+    loadFeatureSets();
     loadCacheStatus();
   }, [activeDataset]);
 
@@ -54,7 +98,7 @@ function MachineLearningTab({ activeDataset }) {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/datasets/${activeDataset.id}/machine-learning/train`,
+        `${API_URL}/datasets/${activeDataset.id}/machine-learning/train`,
         {
           method: "POST",
           headers: {
@@ -147,36 +191,65 @@ function MachineLearningTab({ activeDataset }) {
         </section>
 
         <section className="ml-card">
-          <h4>Feature Groups</h4>
+          <h4>Feature Set</h4>
 
-          <div className="ml-option-list">
-            <label>
-              <input
-                type="checkbox"
-                checked={useMorphology}
-                onChange={(event) => setUseMorphology(event.target.checked)}
-              />
-              Morphology
-            </label>
+          {featureSetsError && (
+            <p className="ml-field-error">
+              {featureSetsError}
+            </p>
+          )}
 
-            <label>
-              <input
-                type="checkbox"
-                checked={useIntensity}
-                onChange={(event) => setUseIntensity(event.target.checked)}
-              />
-              Intensity
-            </label>
+          {featureSets.length === 0 ? (
+            <p className="ml-empty-message">
+              No persisted feature sets are available. Create one in
+              Feature Analysis first.
+            </p>
+          ) : (
+            <>
+              <label className="ml-field">
+                <span>Stored feature set</span>
 
-            <label>
-              <input
-                type="checkbox"
-                checked={useTexture}
-                onChange={(event) => setUseTexture(event.target.checked)}
-              />
-              Texture
-            </label>
-          </div>
+                <select
+                  value={selectedFeatureSetId}
+                  onChange={(event) =>
+                    setSelectedFeatureSetId(event.target.value)
+                  }
+                >
+                  {featureSets.map((featureSet) => (
+                    <option
+                      key={featureSet.id}
+                      value={featureSet.id}
+                    >
+                      {featureSet.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {selectedFeatureSetId && (() => {
+                const selectedFeatureSet = featureSets.find(
+                  (featureSet) =>
+                    String(featureSet.id) === selectedFeatureSetId
+                );
+
+                if (!selectedFeatureSet) {
+                  return null;
+                }
+
+                return (
+                  <div className="ml-feature-set-summary">
+                    <span>
+                      {selectedFeatureSet.num_rows} rows
+                    </span>
+
+                    <span>
+                      {selectedFeatureSet.num_features} features
+                    </span>
+                  </div>
+                );
+              })()}
+            </>
+          )}
         </section>
 
         <section className="ml-card">
@@ -282,7 +355,10 @@ function MachineLearningTab({ activeDataset }) {
           Evaluating model using cross-validation...
         </p>
       )}
-      <Button onClick={handleTrainModel} disabled={isTraining}>
+      <Button
+        onClick={handleTrainModel}
+        disabled={isTraining || !selectedFeatureSetId}
+      >
         {isTraining ? "Evaluating..." : "Evaluate Model"}
       </Button>
       {trainingError && (
@@ -434,7 +510,7 @@ function MachineLearningTab({ activeDataset }) {
                           </p>
 
                           <img
-                            src={`http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${comparisonA.image_id}/preview`}
+                            src={`http://127.0.0.1:8002/datasets/${activeDataset.id}/images/${comparisonA.image_id}/preview`}
                             alt={`Image ${comparisonA.image_id}`}
                             className="ml-comparison-image"
                           />
@@ -455,7 +531,7 @@ function MachineLearningTab({ activeDataset }) {
                           </p>
 
                           <img
-                            src={`http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${comparisonB.image_id}/preview`}
+                            src={`http://127.0.0.1:8002/datasets/${activeDataset.id}/images/${comparisonB.image_id}/preview`}
                             alt={`Image ${comparisonB.image_id}`}
                             className="ml-comparison-image"
                           />
@@ -502,7 +578,7 @@ function MachineLearningTab({ activeDataset }) {
                                 onClick={() => setSelectedPredictionImage(item)}
                               >
                                 <img
-                                  src={`http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${item.image_id}/preview`}
+                                  src={`http://127.0.0.1:8002/datasets/${activeDataset.id}/images/${item.image_id}/preview`}
                                   alt={`Image ${item.image_id}`}
                                   className="ml-misclassified-thumbnail"
                                 />
@@ -537,7 +613,7 @@ function MachineLearningTab({ activeDataset }) {
                 </div>
 
                 <img
-                  src={`http://127.0.0.1:8000/datasets/${activeDataset.id}/images/${selectedPredictionImage.image_id}/preview`}
+                  src={`http://127.0.0.1:8002/datasets/${activeDataset.id}/images/${selectedPredictionImage.image_id}/preview`}
                   alt={`Image ${selectedPredictionImage.image_id}`}
                   className="ml-selected-prediction-image"
                 />

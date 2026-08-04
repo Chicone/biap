@@ -6,6 +6,7 @@ from fastapi import UploadFile, File
 from PIL import Image
 import shutil
 from pathlib import Path
+import json
 
 from vision.segmentation import segment_otsu
 from vision.io import load_image, pil_to_numpy, normalize_for_display
@@ -125,6 +126,27 @@ class MachineLearningTrainRequest(BaseModel):
   cv_strategy: str = "stratified"
   cv_folds: int
   random_seed: int
+
+class FeatureSetCreateRequest(BaseModel):
+  name: str
+
+  morphology: bool = True
+  intensity: bool = True
+  texture: bool = True
+
+  foreground: str = "bright"
+
+  remove_constant: bool = True
+  remove_correlated: bool = False
+  correlation_threshold: float = 0.95
+
+  scaling: str = "none"
+
+  pca_components: int = 0
+  pca_mode: str = "add"
+
+  umap_components: int = 0
+  umap_mode: str = "add"
 
 @app.get("/experiments")
 def get_experiments():
@@ -1151,6 +1173,207 @@ def build_dataset_features(
         "umap": umap_result,
     }
 
+@app.post("/datasets/{dataset_id}/feature-sets")
+def create_feature_set(
+    dataset_id: int,
+    request: FeatureSetCreateRequest,
+):
+    feature_set_name = request.name.strip()
+
+    if not feature_set_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Feature set name is required.",
+        )
+
+    with get_connection() as conn:
+        dataset_row = conn.execute(
+            """
+            SELECT id
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+    if dataset_row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found.",
+        )
+
+    with get_connection() as conn:
+        existing_feature_set = conn.execute(
+            """
+            SELECT id
+            FROM feature_sets
+            WHERE dataset_id = ?
+            AND LOWER(name) = LOWER(?)
+            """,
+            (
+                dataset_id,
+                feature_set_name,
+            ),
+        ).fetchone()
+
+    if existing_feature_set is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f'A feature set named "{feature_set_name}" already exists.',
+        )
+
+    configuration = request.model_dump(
+        exclude={"name"},
+    )
+
+    result = build_dataset_features(
+        dataset_id=dataset_id,
+        morphology=request.morphology,
+        intensity=request.intensity,
+        texture=request.texture,
+        foreground=request.foreground,
+        remove_constant=request.remove_constant,
+        remove_correlated=request.remove_correlated,
+        correlation_threshold=request.correlation_threshold,
+        scaling=request.scaling,
+        pca_components=request.pca_components,
+        pca_mode=request.pca_mode,
+        umap_components=request.umap_components,
+        umap_mode=request.umap_mode,
+    )
+
+    feature_names = result["feature_names"]
+    feature_rows = result["features"]
+
+    if not feature_rows:
+        raise HTTPException(
+            status_code=400,
+            detail="The generated feature set contains no rows.",
+        )
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO feature_sets
+            (
+                dataset_id,
+                name,
+                configuration_json,
+                feature_names_json,
+                num_rows,
+                num_features
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset_id,
+                feature_set_name,
+                json.dumps(configuration, sort_keys=True),
+                json.dumps(feature_names),
+                len(feature_rows),
+                len(feature_names),
+            ),
+        )
+
+        feature_set_id = cursor.lastrowid
+
+        rows_to_insert = []
+
+        for feature_row in feature_rows:
+            image_id = feature_row.get("image_id")
+            object_label = feature_row.get("label")
+
+            stored_features = {
+                feature_name: feature_row.get(feature_name)
+                for feature_name in feature_names
+            }
+
+            rows_to_insert.append(
+                (
+                    feature_set_id,
+                    image_id,
+                    object_label,
+                    json.dumps(
+                        stored_features,
+                        sort_keys=True,
+                    ),
+                )
+            )
+
+        conn.executemany(
+            """
+            INSERT INTO feature_set_rows
+            (
+                feature_set_id,
+                image_id,
+                object_label,
+                features_json
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            rows_to_insert,
+        )
+
+    return {
+        **result,
+        "feature_set_id": feature_set_id,
+        "name": feature_set_name,
+        "configuration": configuration,
+        "persisted": True,
+    }
+
+@app.get("/datasets/{dataset_id}/feature-sets")
+def get_feature_sets(dataset_id: int):
+    with get_connection() as conn:
+        dataset_row = conn.execute(
+            """
+            SELECT id
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+        if dataset_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Dataset not found.",
+            )
+
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                dataset_id,
+                name,
+                configuration_json,
+                feature_names_json,
+                num_rows,
+                num_features,
+                created_at
+            FROM feature_sets
+            WHERE dataset_id = ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (dataset_id,),
+        ).fetchall()
+
+    feature_sets = []
+
+    for row in rows:
+        feature_set = dict(row)
+
+        feature_set["configuration"] = json.loads(
+            feature_set.pop("configuration_json")
+        )
+
+        feature_set["feature_names"] = json.loads(
+            feature_set.pop("feature_names_json")
+        )
+
+        feature_sets.append(feature_set)
+
+    return feature_sets
 
 @app.get("/datasets/{dataset_id}/images/{image_id}/overlay")
 def get_image_overlay(

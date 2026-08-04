@@ -20,7 +20,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "http://127.0.0.1:8002";
 
 function DatasetWorkspacePage() {
   const { experimentId, datasetId } = useParams();

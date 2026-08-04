@@ -33,3 +33,4 @@ data/demo/*
 
 # SQLite database
 backend/data/biap.sqlite
+data/biap.sqlite

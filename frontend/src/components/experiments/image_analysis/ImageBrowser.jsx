@@ -20,7 +20,7 @@ function ImageBrowser({ images, selectedImage, onSelectImage }) {
             onClick={() => onSelectImage(image)}
           >
             <img
-              src={`http://127.0.0.1:8000${image.url}`}
+              src={`http://127.0.0.1:8002${image.url}`}
               alt={image.filename}
               className="image-thumbnail"
             />
