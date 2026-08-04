@@ -5,6 +5,7 @@ import {
   getImages,
   importFolder,
   uploadImage,
+  deleteFeatureSet,
 } from "@/services/imageService";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,11 +76,11 @@ function ImagesTab({ activeDataset }) {
       return;
     }
 
-    await importFolder(
-      activeDataset.id,
-      folderPath,
-      activeDataset.name
-    );
+  await importFolder(
+    activeDataset.id,
+    folderPath,
+    activeDataset.name
+  );
 
     const updatedImages = await getImages(activeDataset.id);
     setImages(updatedImages);

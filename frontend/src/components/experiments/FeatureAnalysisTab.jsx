@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import FeatureMatrixTable from "@/components/experiments/feature_analysis/FeatureMatrixTable";
 import FeatureSetCard from "@/components/experiments/feature_analysis/FeatureSetCard";
@@ -19,6 +19,9 @@ function FeatureAnalysisTab({ activeDataset }) {
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildError, setBuildError] = useState(null);
   const [showMatrix, setShowMatrix] = useState(false);
+  const [savedFeatureSets, setSavedFeatureSets] = useState([]);
+  const [savedFeatureSetsError, setSavedFeatureSetsError] = useState(null);
+  const [isDeletingFeatureSet, setIsDeletingFeatureSet] = useState(false);
 
   const [removeConstantFeatures, setRemoveConstantFeatures] = useState(true);
   const [removeCorrelatedFeatures, setRemoveCorrelatedFeatures] = useState(false);
@@ -55,37 +58,6 @@ function FeatureAnalysisTab({ activeDataset }) {
     setIsBuilding(true);
     setBuildError(null);
     setFeatureSet(null);
-
-    const response = await fetch(
-      `${API_URL}/datasets/${activeDataset.id}/feature-sets`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: featureSetName.trim(),
-
-          morphology: selectedSources.morphology,
-          intensity: selectedSources.intensity,
-          texture: selectedSources.texture,
-
-          foreground: "bright",
-
-          remove_constant: removeConstantFeatures,
-          remove_correlated: removeCorrelatedFeatures,
-          correlation_threshold: correlationThreshold,
-
-          scaling: scalingMethod,
-
-          pca_components: pcaComponents,
-          pca_mode: pcaMode,
-
-          umap_components: umapComponents,
-          umap_mode: umapMode,
-        }),
-      }
-    );
 
     try {
       const response = await fetch(
@@ -129,10 +101,88 @@ function FeatureAnalysisTab({ activeDataset }) {
         name: featureSetName,
       });
       setShowMatrix(false);
+      await loadSavedFeatureSets();
     } catch (error) {
       setBuildError(error.message);
     } finally {
       setIsBuilding(false);
+    }
+  }
+
+  async function loadSavedFeatureSets() {
+    if (!activeDataset) {
+      setSavedFeatureSets([]);
+      return;
+    }
+
+    setSavedFeatureSetsError(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/feature-sets`
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Failed to load saved feature sets"
+        );
+      }
+
+      setSavedFeatureSets(result);
+    } catch (error) {
+      setSavedFeatureSetsError(error.message);
+      setSavedFeatureSets([]);
+    }
+  }
+
+  useEffect(() => {
+    loadSavedFeatureSets();
+  }, [activeDataset]);
+
+  async function handleDeleteFeatureSet(featureSetToDelete) {
+    const confirmed = window.confirm(
+      `Delete feature set "${featureSetToDelete.name}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeletingFeatureSet(true);
+    setSavedFeatureSetsError(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/feature-sets/${featureSetToDelete.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Failed to delete feature set"
+        );
+      }
+
+      if (featureSet?.feature_set_id === featureSetToDelete.id) {
+        setFeatureSet(null);
+        setShowMatrix(false);
+      }
+
+      await loadSavedFeatureSets();
+    } catch (error) {
+      setSavedFeatureSetsError(error.message);
+    } finally {
+      setIsDeletingFeatureSet(false);
     }
   }
 
@@ -442,6 +492,48 @@ function FeatureAnalysisTab({ activeDataset }) {
           </Button>
 
           {buildError && <p className="error-text">{buildError}</p>}
+        </section>
+
+        <section className="feature-builder-panel">
+          <div className="section-label">Saved Feature Sets</div>
+
+          {savedFeatureSetsError && (
+            <p className="error-text">{savedFeatureSetsError}</p>
+          )}
+
+          {savedFeatureSets.length === 0 ? (
+            <p>No saved Feature Sets yet.</p>
+          ) : (
+            <div className="saved-feature-set-list">
+              {savedFeatureSets.map((savedFeatureSet) => (
+                <div
+                  key={savedFeatureSet.id}
+                  className="saved-feature-set-item"
+                >
+                  <div>
+                    <strong>{savedFeatureSet.name}</strong>
+
+                    <span>
+                      {savedFeatureSet.num_rows} rows ·{" "}
+                      {savedFeatureSet.num_features} features
+                    </span>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={isDeletingFeatureSet}
+                    onClick={() =>
+                      handleDeleteFeatureSet(savedFeatureSet)
+                    }
+                  >
+                    Delete
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {featureSet && (

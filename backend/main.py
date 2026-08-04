@@ -1646,3 +1646,43 @@ def delete_dataset(dataset_id: int):
         "dataset_id": dataset_id,
         "status": "deleted",
     }
+
+@app.delete("/feature-sets/{feature_set_id}")
+def delete_feature_set(feature_set_id: int):
+    with get_connection() as conn:
+        feature_set = conn.execute(
+            """
+            SELECT id, name
+            FROM feature_sets
+            WHERE id = ?
+            """,
+            (feature_set_id,),
+        ).fetchone()
+
+        if feature_set is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Feature set not found.",
+            )
+
+        conn.execute(
+            """
+            DELETE FROM feature_set_rows
+            WHERE feature_set_id = ?
+            """,
+            (feature_set_id,),
+        )
+
+        conn.execute(
+            """
+            DELETE FROM feature_sets
+            WHERE id = ?
+            """,
+            (feature_set_id,),
+        )
+
+    return {
+        "feature_set_id": feature_set_id,
+        "name": feature_set["name"],
+        "status": "deleted",
+    }

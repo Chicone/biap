@@ -57,14 +57,6 @@ export async function importFolder(
       ? "import-bbbc021"
       : "import-folder";
 
-  const requestBody = {
-    folder_path: folderPath,
-  };
-
-  if (normalizedDatasetName === "BBBC021") {
-    requestBody.max_images = null;
-  }
-
   const response = await fetch(
     `${API_URL}/datasets/${datasetId}/${importerEndpoint}`,
     {
@@ -72,7 +64,13 @@ export async function importFolder(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        folder_path: folderPath,
+        max_images:
+          normalizedDatasetName === "BBBC021"
+            ? null
+            : 20,
+      }),
     }
   );
 
@@ -108,6 +106,27 @@ export async function evaluateImage(datasetId, imageId, foreground = "bright") {
 
   if (!response.ok) {
     throw new Error("Failed to evaluate image");
+  }
+
+  return response.json();
+}
+
+export async function deleteFeatureSet(featureSetId) {
+  const response = await fetch(
+    `${API_URL}/feature-sets/${featureSetId}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+
+    throw new Error(
+      typeof error?.detail === "string"
+        ? error.detail
+        : "Failed to delete feature set"
+    );
   }
 
   return response.json();
