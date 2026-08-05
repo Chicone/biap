@@ -243,11 +243,233 @@ def _build_dataset(dataset_id: int, config: dict):
     np.array(groups, dtype=object),
   )
 
+def _load_feature_set_dataset(
+    dataset_id: int,
+    feature_set_id: int,
+    target_name: str,
+):
+  allowed_targets = {
+    "moa",
+    "compound",
+    "concentration",
+  }
+
+  if target_name not in allowed_targets:
+    raise ValueError(
+      f"Unsupported target: {target_name}"
+    )
+
+  with get_connection() as conn:
+    feature_set_row = conn.execute(
+      """
+      SELECT
+        id,
+        dataset_id,
+        name,
+        feature_names_json,
+        configuration_json
+      FROM feature_sets
+      WHERE id = ?
+      """,
+      (feature_set_id,),
+    ).fetchone()
+
+    if feature_set_row is None:
+      raise ValueError(
+        f"Feature set {feature_set_id} was not found."
+      )
+
+    feature_set_record = dict(feature_set_row)
+
+    if feature_set_record["dataset_id"] != dataset_id:
+      raise ValueError(
+        "The selected Feature Set does not belong to "
+        "the active dataset."
+      )
+
+    stored_rows = conn.execute(
+      """
+      SELECT
+        feature_set_rows.image_id,
+        feature_set_rows.features_json,
+        images.plate,
+        images.well,
+        images.moa,
+        images.compound,
+        images.concentration
+      FROM feature_set_rows
+      JOIN images
+        ON images.id = feature_set_rows.image_id
+      WHERE feature_set_rows.feature_set_id = ?
+      ORDER BY
+        feature_set_rows.image_id,
+        feature_set_rows.id
+      """,
+      (feature_set_id,),
+    ).fetchall()
+
+  if not stored_rows:
+    raise ValueError(
+      "The selected Feature Set contains no stored rows."
+    )
+
+  stored_feature_names = json.loads(
+    feature_set_record["feature_names_json"]
+  )
+
+  if not stored_feature_names:
+    raise ValueError(
+      "The selected Feature Set contains no features."
+    )
+
+  rows_by_image = {}
+
+  for row in stored_rows:
+    record = dict(row)
+    image_id = int(record["image_id"])
+
+    image_entry = rows_by_image.setdefault(
+      image_id,
+      {
+        "object_features": [],
+        "target": record.get(target_name),
+        "plate": record.get("plate"),
+        "well": record.get("well"),
+      },
+    )
+
+    row_features = json.loads(
+      record["features_json"]
+    )
+
+    image_entry["object_features"].append(
+      row_features
+    )
+
+  aggregated_rows = []
+  targets = []
+  image_ids = []
+  groups = []
+
+  for image_id, image_entry in rows_by_image.items():
+    target_value = image_entry["target"]
+
+    if target_value is None or target_value == "":
+      continue
+
+    object_features = image_entry["object_features"]
+
+    aggregated_features = {}
+
+    for feature_name in stored_feature_names:
+      values = []
+
+      for object_row in object_features:
+        value = object_row.get(feature_name)
+
+        if isinstance(value, (int, float)):
+          numeric_value = float(value)
+
+          if np.isfinite(numeric_value):
+            values.append(numeric_value)
+
+      if not values:
+        continue
+
+      aggregated_features[
+        f"{feature_name}_mean"
+      ] = float(np.mean(values))
+
+      aggregated_features[
+        f"{feature_name}_std"
+      ] = float(np.std(values))
+
+      aggregated_features[
+        f"{feature_name}_min"
+      ] = float(np.min(values))
+
+      aggregated_features[
+        f"{feature_name}_max"
+      ] = float(np.max(values))
+
+    aggregated_features["num_objects"] = int(
+      len(object_features)
+    )
+
+    if not aggregated_features:
+      continue
+
+    plate = image_entry["plate"]
+    well = image_entry["well"]
+
+    group_name = (
+      f"{plate}::{well}"
+      if plate and well
+      else None
+    )
+
+    aggregated_rows.append(aggregated_features)
+    targets.append(str(target_value))
+    image_ids.append(image_id)
+    groups.append(group_name)
+
+  if not aggregated_rows:
+    raise ValueError(
+      "No images with valid targets and Feature Set "
+      "rows were available for evaluation."
+    )
+
+  aggregated_feature_names = sorted(
+    {
+      feature_name
+      for aggregated_row in aggregated_rows
+      for feature_name in aggregated_row.keys()
+    }
+  )
+
+  matrix = np.array(
+    [
+      [
+        aggregated_row.get(
+          feature_name,
+          0.0,
+        )
+        for feature_name
+        in aggregated_feature_names
+      ]
+      for aggregated_row in aggregated_rows
+    ],
+    dtype=float,
+  )
+
+  return (
+    matrix,
+    np.array(targets),
+    aggregated_feature_names,
+    image_ids,
+    np.array(groups, dtype=object),
+    feature_set_record,
+  )
+
 def train_model(dataset_id: int, config: dict):
-  algorithm = config.get("algorithm", "random_forest")
+  algorithm = config.get(
+    "algorithm",
+    "random_forest",
+  )
 
   if algorithm != "random_forest":
-    raise ValueError(f"Unsupported algorithm: {algorithm}")
+    raise ValueError(
+      f"Unsupported algorithm: {algorithm}"
+    )
+
+  feature_set_id = config.get("feature_set_id")
+
+  if feature_set_id is None:
+    raise ValueError(
+      "A persisted Feature Set must be selected."
+    )
+
+  target_name = config.get("target", "moa")
 
   (
     X,
@@ -255,7 +477,12 @@ def train_model(dataset_id: int, config: dict):
     feature_names,
     image_ids,
     groups,
-  ) = _build_dataset(dataset_id, config)
+    feature_set_record,
+  ) = _load_feature_set_dataset(
+    dataset_id=dataset_id,
+    feature_set_id=int(feature_set_id),
+    target_name=target_name,
+  )
 
   class_counts = Counter(y)
 
@@ -441,6 +668,8 @@ def train_model(dataset_id: int, config: dict):
 
   return {
     "dataset_id": dataset_id,
+    "feature_set_id": int(feature_set_id),
+    "feature_set_name": feature_set_record["name"],
     "status": "evaluated",
     "algorithm": algorithm,
     "target": config.get("target", "moa"),

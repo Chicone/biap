@@ -120,9 +120,9 @@ class BBBC021ImportRequest(BaseModel):
 
 
 class MachineLearningTrainRequest(BaseModel):
+  feature_set_id: int
   target: str
   algorithm: str
-  features: dict
   cv_strategy: str = "stratified"
   cv_folds: int
   random_seed: int

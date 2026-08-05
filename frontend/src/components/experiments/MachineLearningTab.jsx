@@ -11,13 +11,9 @@ function MachineLearningTab({ activeDataset }) {
   const [cvStrategy, setCvStrategy] = useState("stratified");
   const [cvFolds, setCvFolds] = useState(5);
   const [randomSeed, setRandomSeed] = useState(42);
-  const [useMorphology, setUseMorphology] = useState(true);
-  const [useIntensity, setUseIntensity] = useState(true);
-  const [useTexture, setUseTexture] = useState(true);
   const [trainingResult, setTrainingResult] = useState(null);
   const [trainingError, setTrainingError] = useState(null);
   const [isTraining, setIsTraining] = useState(false);
-  const [cacheStatus, setCacheStatus] = useState(null);
   const [confusionDisplay, setConfusionDisplay] = useState("counts");
   const [selectedConfusionCell, setSelectedConfusionCell] = useState(null);
   const [selectedPredictionImage, setSelectedPredictionImage] = useState(null);
@@ -64,26 +60,9 @@ function MachineLearningTab({ activeDataset }) {
     }
   }
 
-  async function loadCacheStatus() {
-    if (!activeDataset) {
-      return;
-    }
-
-    const response = await fetch(
-      `${API_URL}/datasets/${activeDataset.id}/feature-sets`
-    );
-
-    if (!response.ok) {
-      return;
-    }
-
-    const result = await response.json();
-    setCacheStatus(result);
-  }
 
   useEffect(() => {
     loadFeatureSets();
-    loadCacheStatus();
   }, [activeDataset]);
 
 
@@ -105,16 +84,12 @@ function MachineLearningTab({ activeDataset }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            feature_set_id: Number(selectedFeatureSetId),
             target,
             algorithm,
             cv_strategy: cvStrategy,
             cv_folds: cvFolds,
             random_seed: randomSeed,
-            features: {
-              morphology: useMorphology,
-              intensity: useIntensity,
-              texture: useTexture,
-            },
           }),
         }
       );
@@ -122,11 +97,18 @@ function MachineLearningTab({ activeDataset }) {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.detail || "Training failed");
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : JSON.stringify(
+                result.detail ?? result,
+                null,
+                2
+              )
+        );
       }
 
       setTrainingResult(result);
-      await loadCacheStatus();
     } catch (error) {
       setTrainingError(error.message);
     } finally {
@@ -323,33 +305,6 @@ function MachineLearningTab({ activeDataset }) {
       </section>
       </div>
 
-      {cacheStatus && (
-        <section className="ml-cache-card">
-          <h4>Feature Cache</h4>
-
-          <p>
-            {cacheStatus.cached_images} / {cacheStatus.total_images} images cached
-          </p>
-
-          <progress
-            value={cacheStatus.cached_images}
-            max={cacheStatus.total_images || 1}
-          />
-
-          {!cacheStatus.complete && (
-            <small>
-              First training run will compute missing features. Later runs will be faster.
-            </small>
-          )}
-
-          {cacheStatus.complete && (
-            <small>
-              Feature cache complete. Training can reuse cached features.
-            </small>
-          )}
-        </section>
-      )}
-
       {isTraining && (
         <p className="ml-training-status">
           Evaluating model using cross-validation...
@@ -373,6 +328,13 @@ function MachineLearningTab({ activeDataset }) {
           <h4>Cross-Validation Results</h4>
 
           <div className="ml-results-grid">
+            <div>
+              <span>Feature Set</span>
+              <strong>
+                {trainingResult.feature_set_name}
+              </strong>
+            </div>
+
             <div>
               <span>Samples</span>
               <strong>{trainingResult.num_samples}</strong>
