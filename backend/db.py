@@ -59,27 +59,6 @@ def init_db():
         """)
 
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS image_feature_cache (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                image_id INTEGER NOT NULL,
-                channel_name TEXT,
-                foreground TEXT NOT NULL,
-                aggregation_level TEXT NOT NULL,
-                feature_config TEXT NOT NULL,
-                features_json TEXT NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE (
-                    image_id,
-                    channel_name,
-                    foreground,
-                    aggregation_level,
-                    feature_config
-                ),
-                FOREIGN KEY(image_id) REFERENCES images(id)
-            )
-        """)
-
-        conn.execute("""
             CREATE TABLE IF NOT EXISTS feature_sets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 dataset_id INTEGER NOT NULL,

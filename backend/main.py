@@ -545,52 +545,6 @@ async def import_bbbc021(dataset_id: int, request: BBBC021ImportRequest):
 
     return result
 
-@app.get("/datasets/{dataset_id}/machine-learning/cache-status")
-def get_machine_learning_cache_status(
-    dataset_id: int,
-    channel: str | None = None,
-    foreground: str = "bright",
-    aggregation_level: str = "image",
-):
-    with get_connection() as conn:
-        total_images = conn.execute(
-            """
-            SELECT COUNT(*)
-            FROM images
-            WHERE dataset_id = ?
-            AND moa IS NOT NULL
-            """,
-            (dataset_id,),
-        ).fetchone()[0]
-
-        cached_images = conn.execute(
-            """
-            SELECT COUNT(DISTINCT images.id)
-            FROM images
-            JOIN image_feature_cache
-            ON image_feature_cache.image_id = images.id
-            WHERE images.dataset_id = ?
-            AND images.moa IS NOT NULL
-            AND COALESCE(image_feature_cache.channel_name, '') = COALESCE(?, '')
-            AND image_feature_cache.foreground = ?
-            AND image_feature_cache.aggregation_level = ?
-            """,
-            (
-                dataset_id,
-                channel,
-                foreground,
-                aggregation_level,
-            ),
-        ).fetchone()[0]
-
-    return {
-        "dataset_id": dataset_id,
-        "total_images": total_images,
-        "cached_images": cached_images,
-        "missing_images": total_images - cached_images,
-        "complete": cached_images == total_images and total_images > 0,
-    }
-
 @app.post("/datasets/{dataset_id}/machine-learning/train")
 def train_machine_learning_model(
     dataset_id: int,
@@ -1592,10 +1546,60 @@ def evaluate_image(
         "recall": recall(prediction, ground_truth),
     }
 
-
 @app.delete("/datasets/{dataset_id}")
 def delete_dataset(dataset_id: int):
     with get_connection() as conn:
+        dataset_row = conn.execute(
+            """
+            SELECT id, name
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+        if dataset_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Dataset not found.",
+            )
+
+        feature_set_rows = conn.execute(
+            """
+            SELECT id
+            FROM feature_sets
+            WHERE dataset_id = ?
+            """,
+            (dataset_id,),
+        ).fetchall()
+
+        feature_set_ids = [
+            row["id"]
+            for row in feature_set_rows
+        ]
+
+        if feature_set_ids:
+            placeholders = ",".join(
+                "?"
+                for _ in feature_set_ids
+            )
+
+            conn.execute(
+                f"""
+                DELETE FROM feature_set_rows
+                WHERE feature_set_id IN ({placeholders})
+                """,
+                feature_set_ids,
+            )
+
+        conn.execute(
+            """
+            DELETE FROM feature_sets
+            WHERE dataset_id = ?
+            """,
+            (dataset_id,),
+        )
+
         image_rows = conn.execute(
             """
             SELECT id
@@ -1605,17 +1609,15 @@ def delete_dataset(dataset_id: int):
             (dataset_id,),
         ).fetchall()
 
-        image_ids = [row["id"] for row in image_rows]
+        image_ids = [
+            row["id"]
+            for row in image_rows
+        ]
 
         if image_ids:
-            placeholders = ",".join("?" for _ in image_ids)
-
-            conn.execute(
-                f"""
-                DELETE FROM image_feature_cache
-                WHERE image_id IN ({placeholders})
-                """,
-                image_ids,
+            placeholders = ",".join(
+                "?"
+                for _ in image_ids
             )
 
             conn.execute(
@@ -1644,6 +1646,7 @@ def delete_dataset(dataset_id: int):
 
     return {
         "dataset_id": dataset_id,
+        "name": dataset_row["name"],
         "status": "deleted",
     }
 
