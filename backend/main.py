@@ -34,6 +34,7 @@ from sklearn.decomposition import PCA
 import umap
 from dataset_importers.bbbc021 import BBBC021Importer
 from ml.trainer import train_model
+from vision.foundation_models.dinov2 import get_dinov2_model
 
 app = FastAPI()
 init_db()
@@ -147,6 +148,10 @@ class FeatureSetCreateRequest(BaseModel):
 
   umap_components: int = 0
   umap_mode: str = "add"
+
+class DINOv2FeatureSetCreateRequest(BaseModel):
+  name: str
+  channel: str | None = None
 
 @app.get("/experiments")
 def get_experiments():
@@ -1274,6 +1279,234 @@ def create_feature_set(
         "name": feature_set_name,
         "configuration": configuration,
         "persisted": True,
+    }
+
+@app.post("/datasets/{dataset_id}/feature-sets/dinov2")
+def create_dinov2_feature_set(
+    dataset_id: int,
+    request: DINOv2FeatureSetCreateRequest,
+):
+    feature_set_name = request.name.strip()
+
+    if not feature_set_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Feature set name is required.",
+        )
+
+    with get_connection() as conn:
+        dataset_row = conn.execute(
+            """
+            SELECT id
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+        if dataset_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Dataset not found.",
+            )
+
+        existing_feature_set = conn.execute(
+            """
+            SELECT id
+            FROM feature_sets
+            WHERE dataset_id = ?
+            AND LOWER(name) = LOWER(?)
+            """,
+            (
+                dataset_id,
+                feature_set_name,
+            ),
+        ).fetchone()
+
+        if existing_feature_set is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f'A feature set named "{feature_set_name}" '
+                    "already exists."
+                ),
+            )
+
+        image_rows = conn.execute(
+            """
+            SELECT *
+            FROM images
+            WHERE dataset_id = ?
+            ORDER BY id
+            """,
+            (dataset_id,),
+        ).fetchall()
+
+    if not image_rows:
+        raise HTTPException(
+            status_code=400,
+            detail="The dataset contains no images.",
+        )
+
+    model = get_dinov2_model()
+
+    feature_names = [
+        f"dinov2_{index}"
+        for index in range(1, 769)
+    ]
+
+    generated_rows = []
+
+    for image_row in image_rows:
+        image_record = dict(image_row)
+        image_id = int(image_record["id"])
+
+        if request.channel:
+            with get_connection() as conn:
+                channel_row = conn.execute(
+                    """
+                    SELECT filename
+                    FROM image_channels
+                    WHERE image_id = ?
+                    AND LOWER(channel_name) = LOWER(?)
+                    """,
+                    (
+                        image_id,
+                        request.channel,
+                    ),
+                ).fetchone()
+
+            if channel_row is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f'Channel "{request.channel}" was not found '
+                        f"for image {image_id}."
+                    ),
+                )
+
+            image_filename = channel_row["filename"]
+        else:
+            image_filename = image_record["filename"]
+
+        image_path = DATA_ROOT / image_filename
+
+        if not image_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Image file not found: {image_path}",
+            )
+
+        image = Image.open(image_path)
+
+        try:
+            embedding = model.embed(image)
+        finally:
+            image.close()
+
+        embedding = np.asarray(
+            embedding,
+            dtype=np.float32,
+        ).reshape(-1)
+
+        if embedding.shape[0] != 768:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "DINOv2 produced an unexpected embedding "
+                    f"size: {embedding.shape[0]}."
+                ),
+            )
+
+        embedding_features = {
+            feature_name: float(value)
+            for feature_name, value in zip(
+                feature_names,
+                embedding,
+            )
+        }
+
+        generated_rows.append(
+            (
+                image_id,
+                embedding_features,
+            )
+        )
+
+    configuration = {
+        "extractor": "dinov2",
+        "model_name": model.model_name,
+        "channel": request.channel,
+        "aggregation_level": "image",
+        "embedding_size": 768,
+    }
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO feature_sets
+            (
+                dataset_id,
+                name,
+                configuration_json,
+                feature_names_json,
+                num_rows,
+                num_features
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset_id,
+                feature_set_name,
+                json.dumps(
+                    configuration,
+                    sort_keys=True,
+                ),
+                json.dumps(feature_names),
+                len(generated_rows),
+                len(feature_names),
+            ),
+        )
+
+        feature_set_id = cursor.lastrowid
+
+        conn.executemany(
+            """
+            INSERT INTO feature_set_rows
+            (
+                feature_set_id,
+                image_id,
+                object_label,
+                features_json
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            [
+                (
+                    feature_set_id,
+                    image_id,
+                    None,
+                    json.dumps(
+                        embedding_features,
+                        sort_keys=True,
+                    ),
+                )
+                for image_id, embedding_features
+                in generated_rows
+            ],
+        )
+
+    return {
+        "feature_set_id": feature_set_id,
+        "dataset_id": dataset_id,
+        "name": feature_set_name,
+        "configuration": configuration,
+        "feature_names": feature_names,
+        "num_rows": len(generated_rows),
+        "num_features": len(feature_names),
+        "images_processed": len(generated_rows),
+        "persisted": True,
+        "status": "ready",
     }
 
 @app.get("/datasets/{dataset_id}/feature-sets")

@@ -85,3 +85,13 @@ class DinoV2(VisionFoundationModel):
         embedding = self.model(tensor)
 
       return embedding.squeeze(0).cpu().numpy()
+
+_dinov2_instance = None
+
+def get_dinov2_model():
+  global _dinov2_instance
+
+  if _dinov2_instance is None:
+    _dinov2_instance = DinoV2()
+
+  return _dinov2_instance

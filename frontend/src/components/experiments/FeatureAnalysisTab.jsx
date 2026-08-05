@@ -23,6 +23,12 @@ function FeatureAnalysisTab({ activeDataset }) {
   const [savedFeatureSetsError, setSavedFeatureSetsError] = useState(null);
   const [isDeletingFeatureSet, setIsDeletingFeatureSet] = useState(false);
 
+  const [foundationFeatureSetName, setFoundationFeatureSetName] = useState("DINOv2 Embeddings v1");
+  const [foundationChannel, setFoundationChannel] = useState("DAPI");
+  const [isGeneratingFoundationFeatures, setIsGeneratingFoundationFeatures] = useState(false);
+  const [foundationFeaturesError, setFoundationFeaturesError] = useState(null);
+  const [foundationFeaturesResult, setFoundationFeaturesResult] = useState(null);
+
   const [removeConstantFeatures, setRemoveConstantFeatures] = useState(true);
   const [removeCorrelatedFeatures, setRemoveCorrelatedFeatures] = useState(false);
   const [correlationThreshold, setCorrelationThreshold] = useState(0.95);
@@ -142,6 +148,49 @@ function FeatureAnalysisTab({ activeDataset }) {
   useEffect(() => {
     loadSavedFeatureSets();
   }, [activeDataset]);
+
+  async function handleGenerateDINOv2FeatureSet() {
+    if (!activeDataset || !foundationFeatureSetName.trim()) {
+      return;
+    }
+
+    setIsGeneratingFoundationFeatures(true);
+    setFoundationFeaturesError(null);
+    setFoundationFeaturesResult(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/feature-sets/dinov2`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: foundationFeatureSetName.trim(),
+            channel: foundationChannel.trim() || null,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "DINOv2 feature generation failed"
+        );
+      }
+
+      setFoundationFeaturesResult(result);
+      await loadSavedFeatureSets();
+    } catch (error) {
+      setFoundationFeaturesError(error.message);
+    } finally {
+      setIsGeneratingFoundationFeatures(false);
+    }
+  }
 
   async function handleDeleteFeatureSet(featureSetToDelete) {
     const confirmed = window.confirm(
@@ -492,6 +541,83 @@ function FeatureAnalysisTab({ activeDataset }) {
           </Button>
 
           {buildError && <p className="error-text">{buildError}</p>}
+        </section>
+
+        <section className="feature-builder-panel">
+          <div className="section-label">
+            Foundation Model Features
+          </div>
+
+          <label className="feature-builder-field">
+            Model
+            <input
+              value="DINOv2 ViT-B/14"
+              disabled
+            />
+          </label>
+
+          <label className="feature-builder-field">
+            Feature set name
+            <input
+              value={foundationFeatureSetName}
+              onChange={(event) =>
+                setFoundationFeatureSetName(event.target.value)
+              }
+              disabled={isGeneratingFoundationFeatures}
+              placeholder="DINOv2 Embeddings v1"
+            />
+          </label>
+
+          <label className="feature-builder-field">
+            Image channel
+            <select
+              value={foundationChannel}
+              onChange={(event) =>
+                setFoundationChannel(event.target.value)
+              }
+              disabled={isGeneratingFoundationFeatures}
+            >
+              <option value="DAPI">DAPI</option>
+              <option value="Tubulin">Tubulin</option>
+              <option value="Actin">Actin</option>
+            </select>
+          </label>
+
+          <p>
+            Generates one 768-dimensional DINOv2 embedding
+            for each image using the selected channel.
+          </p>
+
+          <Button
+            onClick={handleGenerateDINOv2FeatureSet}
+            disabled={
+              isGeneratingFoundationFeatures ||
+              !foundationFeatureSetName.trim()
+            }
+          >
+            {isGeneratingFoundationFeatures
+              ? "Generating Embeddings..."
+              : "Generate DINOv2 Feature Set"}
+          </Button>
+
+          {foundationFeaturesError && (
+            <p className="error-text">
+              {foundationFeaturesError}
+            </p>
+          )}
+
+          {foundationFeaturesResult && (
+            <div className="foundation-feature-result">
+              <strong>
+                {foundationFeaturesResult.name}
+              </strong>
+
+              <span>
+                {foundationFeaturesResult.num_rows} images ·{" "}
+                {foundationFeaturesResult.num_features} embedding features
+              </span>
+            </div>
+          )}
         </section>
 
         <section className="feature-builder-panel">

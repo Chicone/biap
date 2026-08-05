@@ -90,6 +90,10 @@ def _load_feature_set_dataset(
       "The selected Feature Set contains no features."
     )
 
+  feature_set_configuration = json.loads(
+    feature_set_record["configuration_json"]
+  )
+
   rows_by_image = {}
 
   for row in stored_rows:
@@ -127,42 +131,76 @@ def _load_feature_set_dataset(
 
     object_features = image_entry["object_features"]
 
-    aggregated_features = {}
-
-    for feature_name in stored_feature_names:
-      values = []
-
-      for object_row in object_features:
-        value = object_row.get(feature_name)
-
-        if isinstance(value, (int, float)):
-          numeric_value = float(value)
-
-          if np.isfinite(numeric_value):
-            values.append(numeric_value)
-
-      if not values:
-        continue
-
-      aggregated_features[
-        f"{feature_name}_mean"
-      ] = float(np.mean(values))
-
-      aggregated_features[
-        f"{feature_name}_std"
-      ] = float(np.std(values))
-
-      aggregated_features[
-        f"{feature_name}_min"
-      ] = float(np.min(values))
-
-      aggregated_features[
-        f"{feature_name}_max"
-      ] = float(np.max(values))
-
-    aggregated_features["num_objects"] = int(
-      len(object_features)
+    aggregation_level = feature_set_configuration.get(
+      "aggregation_level",
+      "object",
     )
+
+    if aggregation_level == "image":
+      if len(object_features) != 1:
+        raise ValueError(
+          "Image-level Feature Sets must contain exactly "
+          "one stored row per image."
+        )
+
+      aggregated_features = {}
+
+      for feature_name in stored_feature_names:
+        value = object_features[0].get(feature_name)
+
+        if not isinstance(value, (int, float)):
+          raise ValueError(
+            f'Feature "{feature_name}" is missing or non-numeric '
+            f"for image {image_id}."
+          )
+
+        numeric_value = float(value)
+
+        if not np.isfinite(numeric_value):
+          raise ValueError(
+            f'Feature "{feature_name}" contains a non-finite '
+            f"value for image {image_id}."
+          )
+
+        aggregated_features[feature_name] = numeric_value
+
+    else:
+      aggregated_features = {}
+
+      for feature_name in stored_feature_names:
+        values = []
+
+        for object_row in object_features:
+          value = object_row.get(feature_name)
+
+          if isinstance(value, (int, float)):
+            numeric_value = float(value)
+
+            if np.isfinite(numeric_value):
+              values.append(numeric_value)
+
+        if not values:
+          continue
+
+        aggregated_features[
+          f"{feature_name}_mean"
+        ] = float(np.mean(values))
+
+        aggregated_features[
+          f"{feature_name}_std"
+        ] = float(np.std(values))
+
+        aggregated_features[
+          f"{feature_name}_min"
+        ] = float(np.min(values))
+
+        aggregated_features[
+          f"{feature_name}_max"
+        ] = float(np.max(values))
+
+      aggregated_features["num_objects"] = int(
+        len(object_features)
+      )
 
     if not aggregated_features:
       continue
