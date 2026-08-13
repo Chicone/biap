@@ -29,6 +29,13 @@ function FeatureAnalysisTab({ activeDataset }) {
   const [foundationFeaturesError, setFoundationFeaturesError] = useState(null);
   const [foundationFeaturesResult, setFoundationFeaturesResult] = useState(null);
 
+  const [combineFeatureSetA, setCombineFeatureSetA] = useState("");
+  const [combineFeatureSetB, setCombineFeatureSetB] = useState("");
+  const [combinedFeatureSetName, setCombinedFeatureSetName] = useState("Handcrafted + DINOv2");
+  const [isCombiningFeatureSets, setIsCombiningFeatureSets] = useState(false);
+  const [combineFeatureSetsError, setCombineFeatureSetsError] = useState(null);
+  const [combineFeatureSetsResult, setCombineFeatureSetsResult] = useState(null);
+
   const [removeConstantFeatures, setRemoveConstantFeatures] = useState(true);
   const [removeCorrelatedFeatures, setRemoveCorrelatedFeatures] = useState(false);
   const [correlationThreshold, setCorrelationThreshold] = useState(0.95);
@@ -192,6 +199,58 @@ function FeatureAnalysisTab({ activeDataset }) {
     }
   }
 
+  async function handleCombineFeatureSets() {
+    if (
+      !activeDataset ||
+      !combineFeatureSetA ||
+      !combineFeatureSetB ||
+      !combinedFeatureSetName.trim()
+    ) {
+      return;
+    }
+
+    setIsCombiningFeatureSets(true);
+    setCombineFeatureSetsError(null);
+    setCombineFeatureSetsResult(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/feature-sets/combine`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: combinedFeatureSetName.trim(),
+            feature_set_ids: [
+              Number(combineFeatureSetA),
+              Number(combineFeatureSetB),
+            ],
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Feature Set combination failed"
+        );
+      }
+
+      setCombineFeatureSetsResult(result);
+
+      await loadSavedFeatureSets();
+    } catch (error) {
+      setCombineFeatureSetsError(error.message);
+    } finally {
+      setIsCombiningFeatureSets(false);
+    }
+  }
+
   async function handleDeleteFeatureSet(featureSetToDelete) {
     const confirmed = window.confirm(
       `Delete feature set "${featureSetToDelete.name}"?`
@@ -246,7 +305,7 @@ function FeatureAnalysisTab({ activeDataset }) {
   return (
     <div className="workspace-content">
       <div className="feature-analysis-layout">
-        <section className="feature-builder-panel">
+        <section className="feature-builder-panel feature-panel-handcrafted">
           <div className="section-label">Feature Set Builder</div>
 
           <label className="feature-builder-field">
@@ -543,7 +602,7 @@ function FeatureAnalysisTab({ activeDataset }) {
           {buildError && <p className="error-text">{buildError}</p>}
         </section>
 
-        <section className="feature-builder-panel">
+        <section className="feature-builder-panel feature-panel-foundation">
           <div className="section-label">
             Foundation Model Features
           </div>
@@ -583,7 +642,7 @@ function FeatureAnalysisTab({ activeDataset }) {
             </select>
           </label>
 
-          <p>
+          <p className="foundation-feature-description">
             Generates one 768-dimensional DINOv2 embedding
             for each image using the selected channel.
           </p>
@@ -620,7 +679,106 @@ function FeatureAnalysisTab({ activeDataset }) {
           )}
         </section>
 
-        <section className="feature-builder-panel">
+        <section className="feature-builder-panel feature-panel-combine">
+          <div className="section-label">
+            Combine Feature Sets
+          </div>
+
+          <label className="feature-builder-field">
+            Feature Set A
+            <select
+              value={combineFeatureSetA}
+              onChange={(event) =>
+                setCombineFeatureSetA(event.target.value)
+              }
+              disabled={isCombiningFeatureSets}
+            >
+              <option value="">
+                Select Feature Set
+              </option>
+
+              {savedFeatureSets.map((savedFeatureSet) => (
+                <option
+                  key={savedFeatureSet.id}
+                  value={savedFeatureSet.id}
+                >
+                  {savedFeatureSet.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="feature-builder-field">
+            Feature Set B
+            <select
+              value={combineFeatureSetB}
+              onChange={(event) =>
+                setCombineFeatureSetB(event.target.value)
+              }
+              disabled={isCombiningFeatureSets}
+            >
+              <option value="">
+                Select Feature Set
+              </option>
+
+              {savedFeatureSets.map((savedFeatureSet) => (
+                <option
+                  key={savedFeatureSet.id}
+                  value={savedFeatureSet.id}
+                >
+                  {savedFeatureSet.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="feature-builder-field">
+            Combined Feature Set name
+            <input
+              value={combinedFeatureSetName}
+              onChange={(event) =>
+                setCombinedFeatureSetName(event.target.value)
+              }
+              disabled={isCombiningFeatureSets}
+            />
+          </label>
+
+          <Button
+            onClick={handleCombineFeatureSets}
+            disabled={
+              isCombiningFeatureSets ||
+              !combineFeatureSetA ||
+              !combineFeatureSetB ||
+              combineFeatureSetA === combineFeatureSetB ||
+              !combinedFeatureSetName.trim()
+            }
+          >
+            {isCombiningFeatureSets
+              ? "Combining..."
+              : "Combine Feature Sets"}
+          </Button>
+
+          {combineFeatureSetsError && (
+            <p className="error-text">
+              {combineFeatureSetsError}
+            </p>
+          )}
+
+          {combineFeatureSetsResult && (
+            <div className="foundation-feature-result">
+              <strong>
+                {combineFeatureSetsResult.name}
+              </strong>
+
+              <span>
+                {combineFeatureSetsResult.num_rows} images ·{" "}
+                {combineFeatureSetsResult.num_features} features
+              </span>
+            </div>
+          )}
+        </section>
+
+        <section className="feature-builder-panel feature-panel-saved">
           <div className="section-label">Saved Feature Sets</div>
 
           {savedFeatureSetsError && (

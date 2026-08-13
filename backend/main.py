@@ -69,6 +69,8 @@ def resolve_image_path(image_record, image_id: int, channel: str | None = None):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
     ],
@@ -152,6 +154,153 @@ class FeatureSetCreateRequest(BaseModel):
 class DINOv2FeatureSetCreateRequest(BaseModel):
   name: str
   channel: str | None = None
+
+class CombineFeatureSetsRequest(BaseModel):
+  name: str
+  feature_set_ids: list[int]
+
+def _load_feature_set_as_image_rows(
+  dataset_id: int,
+  feature_set_id: int,
+):
+  with get_connection() as conn:
+    feature_set_row = conn.execute(
+      """
+      SELECT
+          id,
+          dataset_id,
+          name,
+          configuration_json,
+          feature_names_json
+      FROM feature_sets
+      WHERE id = ?
+      """,
+      (feature_set_id,),
+    ).fetchone()
+
+    if feature_set_row is None:
+      raise HTTPException(
+        status_code=404,
+        detail=f"Feature set {feature_set_id} not found.",
+      )
+
+    feature_set = dict(feature_set_row)
+
+    if feature_set["dataset_id"] != dataset_id:
+      raise HTTPException(
+        status_code=400,
+        detail=(
+          f"Feature set {feature_set_id} does not belong "
+          "to the active dataset."
+        ),
+      )
+
+    rows = conn.execute(
+      """
+      SELECT
+          image_id,
+          features_json
+      FROM feature_set_rows
+      WHERE feature_set_id = ?
+      ORDER BY image_id, id
+      """,
+      (feature_set_id,),
+    ).fetchall()
+
+  configuration = json.loads(
+    feature_set["configuration_json"]
+  )
+
+  feature_names = json.loads(
+    feature_set["feature_names_json"]
+  )
+
+  aggregation_level = configuration.get(
+    "aggregation_level",
+    "object",
+  )
+
+  rows_by_image = {}
+
+  for row in rows:
+    image_id = int(row["image_id"])
+
+    rows_by_image.setdefault(
+      image_id,
+      [],
+    ).append(
+      json.loads(row["features_json"])
+    )
+
+  image_features = {}
+
+  if aggregation_level == "image":
+    for image_id, stored_rows in rows_by_image.items():
+      if len(stored_rows) != 1:
+        raise HTTPException(
+          status_code=400,
+          detail=(
+            f'Image-level Feature Set "{feature_set["name"]}" '
+            f"contains {len(stored_rows)} rows for image {image_id}."
+          ),
+        )
+
+      image_features[image_id] = {
+        feature_name: float(
+          stored_rows[0][feature_name]
+        )
+        for feature_name in feature_names
+        if isinstance(
+          stored_rows[0].get(feature_name),
+          (int, float),
+        )
+      }
+
+  else:
+    for image_id, object_rows in rows_by_image.items():
+      aggregated = {}
+
+      for feature_name in feature_names:
+        values = []
+
+        for object_row in object_rows:
+          value = object_row.get(feature_name)
+
+          if isinstance(value, (int, float)):
+            numeric_value = float(value)
+
+            if np.isfinite(numeric_value):
+              values.append(numeric_value)
+
+        if not values:
+          continue
+
+        aggregated[f"{feature_name}_mean"] = float(
+          np.mean(values)
+        )
+
+        aggregated[f"{feature_name}_std"] = float(
+          np.std(values)
+        )
+
+        aggregated[f"{feature_name}_min"] = float(
+          np.min(values)
+        )
+
+        aggregated[f"{feature_name}_max"] = float(
+          np.max(values)
+        )
+
+      aggregated["num_objects"] = len(object_rows)
+
+      image_features[image_id] = aggregated
+
+  return {
+    "id": feature_set["id"],
+    "name": feature_set["name"],
+    "configuration": configuration,
+    "rows": image_features,
+  }
 
 @app.get("/experiments")
 def get_experiments():
@@ -1505,6 +1654,200 @@ def create_dinov2_feature_set(
         "num_rows": len(generated_rows),
         "num_features": len(feature_names),
         "images_processed": len(generated_rows),
+        "persisted": True,
+        "status": "ready",
+    }
+
+@app.post("/datasets/{dataset_id}/feature-sets/combine")
+def combine_feature_sets(
+    dataset_id: int,
+    request: CombineFeatureSetsRequest,
+):
+    combined_name = request.name.strip()
+
+    if not combined_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Combined Feature Set name is required.",
+        )
+
+    if len(request.feature_set_ids) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Select at least two Feature Sets to combine.",
+        )
+
+    if len(set(request.feature_set_ids)) != len(
+        request.feature_set_ids
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="The same Feature Set cannot be selected twice.",
+        )
+
+    with get_connection() as conn:
+        existing = conn.execute(
+            """
+            SELECT id
+            FROM feature_sets
+            WHERE dataset_id = ?
+            AND LOWER(name) = LOWER(?)
+            """,
+            (
+                dataset_id,
+                combined_name,
+            ),
+        ).fetchone()
+
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f'A feature set named "{combined_name}" '
+                "already exists."
+            ),
+        )
+
+    source_sets = [
+        _load_feature_set_as_image_rows(
+            dataset_id=dataset_id,
+            feature_set_id=feature_set_id,
+        )
+        for feature_set_id in request.feature_set_ids
+    ]
+
+    common_image_ids = set(
+        source_sets[0]["rows"].keys()
+    )
+
+    for source_set in source_sets[1:]:
+        common_image_ids &= set(
+            source_set["rows"].keys()
+        )
+
+    if not common_image_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The selected Feature Sets have no images in common."
+            ),
+        )
+
+    combined_rows = []
+    combined_feature_names = []
+
+    for source_index, source_set in enumerate(
+        source_sets,
+        start=1,
+    ):
+        example_image_id = next(
+            iter(common_image_ids)
+        )
+
+        source_feature_names = sorted(
+            source_set["rows"][example_image_id].keys()
+        )
+
+        for feature_name in source_feature_names:
+            combined_feature_names.append(
+                f"source{source_index}__{feature_name}"
+            )
+
+    for image_id in sorted(common_image_ids):
+        combined_features = {}
+
+        for source_index, source_set in enumerate(
+            source_sets,
+            start=1,
+        ):
+            source_features = source_set["rows"][
+                image_id
+            ]
+
+            for feature_name, value in source_features.items():
+                combined_features[
+                    f"source{source_index}__{feature_name}"
+                ] = float(value)
+
+        combined_rows.append(
+            (
+                image_id,
+                combined_features,
+            )
+        )
+
+    configuration = {
+        "extractor": "combined",
+        "aggregation_level": "image",
+        "source_feature_set_ids": request.feature_set_ids,
+        "source_feature_set_names": [
+            source_set["name"]
+            for source_set in source_sets
+        ],
+    }
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO feature_sets
+            (
+                dataset_id,
+                name,
+                configuration_json,
+                feature_names_json,
+                num_rows,
+                num_features
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset_id,
+                combined_name,
+                json.dumps(
+                    configuration,
+                    sort_keys=True,
+                ),
+                json.dumps(combined_feature_names),
+                len(combined_rows),
+                len(combined_feature_names),
+            ),
+        )
+
+        feature_set_id = cursor.lastrowid
+
+        conn.executemany(
+            """
+            INSERT INTO feature_set_rows
+            (
+                feature_set_id,
+                image_id,
+                object_label,
+                features_json
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            [
+                (
+                    feature_set_id,
+                    image_id,
+                    None,
+                    json.dumps(
+                        features,
+                        sort_keys=True,
+                    ),
+                )
+                for image_id, features
+                in combined_rows
+            ],
+        )
+
+    return {
+        "feature_set_id": feature_set_id,
+        "dataset_id": dataset_id,
+        "name": combined_name,
+        "num_rows": len(combined_rows),
+        "num_features": len(combined_feature_names),
+        "configuration": configuration,
         "persisted": True,
         "status": "ready",
     }
