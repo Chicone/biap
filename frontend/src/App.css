@@ -10,6 +10,8 @@ body {
 }
 
 .app {
+  width: 100vw;
+  max-width: none;
   min-height: 100vh;
   display: flex;
 }
@@ -110,9 +112,8 @@ nav a:hover {
 .main {
   flex: 1;
   min-width: 0;
-  padding: 32px;
+  padding: 16px;
   overflow-x: hidden;
-  transition: margin-left 0.25s ease;
 }
 
 .topbar {
@@ -306,6 +307,10 @@ tbody tr:hover {
   margin-top: 24px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+}
+
+.experiment-workspace {
+  padding: 16px;
 }
 
 .workspace-content {
@@ -1319,8 +1324,16 @@ tbody tr:hover {
 }
 
 .machine-learning-tab {
-  max-width: 100%;
+  width: 100%;
+  max-width: none;
 }
+
+.ml-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
 
 .workspace-header {
   margin-bottom: 1.5rem;
@@ -1339,7 +1352,7 @@ tbody tr:hover {
 
 .ml-config-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 0.9fr) minmax(420px, 1.4fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
 }
 
@@ -1398,13 +1411,6 @@ tbody tr:hover {
   display: flex;
   justify-content: center;
   margin-top: 1.75rem;
-}
-
-@media (max-width: 800px) {
-  .ml-config-grid,
-  .ml-field-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .ml-card:nth-child(1),
@@ -1472,6 +1478,16 @@ tbody tr:hover {
   padding: 0.6rem;
   border-bottom: 1px solid #e2e8f0;
   text-align: left;
+}
+
+.ml-results-card {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ml-results-table {
+  width: max-content;
+  min-width: 100%;
 }
 
 .ml-cache-card {
@@ -1737,9 +1753,9 @@ tbody tr:hover {
 }
 
 .dataset-workspace-wide {
-  width: min(96vw, 1800px);
+  width: 100%;
   max-width: none;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .ml-comparison-grid {
@@ -1758,6 +1774,13 @@ tbody tr:hover {
   display: block;
   color: #64748b;
   line-height: 1.4;
+}
+
+@media (max-width: 800px) {
+  .ml-config-grid,
+  .ml-field-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .saved-feature-set-list {
@@ -1840,3 +1863,4 @@ tbody tr:hover {
   color: #64748b;
   margin: 8px 0 12px;
 }
+

@@ -20,6 +20,10 @@ function MachineLearningTab({ activeDataset }) {
   const [selectedPredictionImage, setSelectedPredictionImage] = useState(null);
   const [comparisonA, setComparisonA] = useState(null);
   const [comparisonB, setComparisonB] = useState(null);
+  const [savedRuns, setSavedRuns] = useState([]);
+  const [savedRunsError, setSavedRunsError] = useState(null);
+  const [selectedRunIds, setSelectedRunIds] = useState([]);
+  const [runFilter, setRunFilter] = useState("");
 
   async function loadAvailableTargets() {
     if (!activeDataset) {
@@ -99,10 +103,41 @@ function MachineLearningTab({ activeDataset }) {
     }
   }
 
+  async function loadSavedRuns() {
+    if (!activeDataset) {
+      setSavedRuns([]);
+      return;
+    }
+
+    setSavedRunsError(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/machine-learning/runs`
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Failed to load ML runs"
+        );
+      }
+
+      setSavedRuns(result);
+    } catch (error) {
+      setSavedRunsError(error.message);
+      setSavedRuns([]);
+    }
+  }
+
 
   useEffect(() => {
     loadFeatureSets();
     loadAvailableTargets();
+    loadSavedRuns();
   }, [activeDataset]);
 
 
@@ -114,6 +149,7 @@ function MachineLearningTab({ activeDataset }) {
     setIsTraining(true);
     setTrainingResult(null);
     setTrainingError(null);
+    await loadSavedRuns();
 
     try {
       const response = await fetch(
@@ -368,6 +404,202 @@ function MachineLearningTab({ activeDataset }) {
         <section className="ml-results-card error">
           <h4>Training failed</h4>
           <p>{trainingError}</p>
+        </section>
+      )}
+
+      <label className="ml-field">
+        <span>Filter saved runs</span>
+        <input
+          type="text"
+          value={runFilter}
+          onChange={(event) =>
+            setRunFilter(event.target.value)
+          }
+          placeholder="Feature set, target, algorithm, run ID..."
+        />
+      </label>
+
+      <section className="ml-results-card">
+        <h4>Saved Evaluation Runs</h4>
+
+        {savedRunsError && (
+          <p className="ml-field-error">
+            {savedRunsError}
+          </p>
+        )}
+
+        {savedRuns.length === 0 ? (
+          <p className="ml-empty-message">
+            No saved evaluation runs yet.
+          </p>
+        ) : (
+          <table className="ml-results-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Run</th>
+                <th>Feature Set</th>
+                <th>Target</th>
+                <th>Algorithm</th>
+                <th>CV</th>
+                <th>Accuracy</th>
+                <th>Macro F1</th>
+                <th>Weighted F1</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {savedRuns
+                .filter((run) => {
+                  const query = runFilter
+                    .trim()
+                    .toLowerCase();
+
+                  if (!query) {
+                    return true;
+                  }
+
+                  const searchableText = [
+                    run.id,
+                    run.feature_set_name,
+                    run.target,
+                    run.algorithm,
+                    run.cv_strategy,
+                  ]
+                    .join(" ")
+                    .toLowerCase();
+
+                  return searchableText.includes(query);
+                })
+                .map((run) => (
+                <tr key={run.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedRunIds.includes(run.id)}
+                      onChange={() => {
+                        setSelectedRunIds((currentIds) =>
+                          currentIds.includes(run.id)
+                            ? currentIds.filter((id) => id !== run.id)
+                            : [...currentIds, run.id]
+                        );
+                      }}
+                    />
+                  </td>
+                  <td>#{run.id}</td>
+
+                  <td>
+                    {run.feature_set_name}
+                  </td>
+
+                  <td>
+                    {run.target}
+                  </td>
+
+                  <td>
+                    {run.algorithm}
+                  </td>
+
+                  <td>
+                    {run.cv_folds}-fold{" "}
+                    {run.cv_strategy}
+                  </td>
+
+                  <td>
+                    {(run.accuracy * 100).toFixed(1)}%
+                  </td>
+
+                  <td>
+                    {run.macro_f1 !== null
+                      ? run.macro_f1.toFixed(3)
+                      : "—"}
+                  </td>
+
+                  <td>
+                    {run.weighted_f1 !== null
+                      ? run.weighted_f1.toFixed(3)
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {selectedRunIds.length > 0 && (
+        <section className="ml-results-card">
+          <h4>Selected Run Comparison</h4>
+
+          <table className="ml-results-table">
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Feature Set</th>
+                <th>Target</th>
+                <th>Algorithm</th>
+                <th>CV</th>
+                <th>Samples</th>
+                <th>Features</th>
+                <th>Accuracy</th>
+                <th>Macro F1</th>
+                <th>Weighted F1</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {savedRuns
+                .filter((run) =>
+                  selectedRunIds.includes(run.id)
+                )
+                .map((run) => (
+                  <tr key={run.id}>
+                    <td>#{run.id}</td>
+
+                    <td>
+                      {run.feature_set_name}
+                    </td>
+
+                    <td>
+                      {run.target}
+                    </td>
+
+                    <td>
+                      {run.algorithm}
+                    </td>
+
+                    <td>
+                      {run.cv_folds}-fold{" "}
+                      {run.cv_strategy}
+                    </td>
+
+                    <td>
+                      {run.num_samples}
+                    </td>
+
+                    <td>
+                      {run.num_features}
+                    </td>
+
+                    <td>
+                      {(run.accuracy * 100).toFixed(1)}%
+                    </td>
+
+                    <td>
+                      {run.macro_f1 !== null
+                        ? run.macro_f1.toFixed(3)
+                        : "—"}
+                    </td>
+
+                    <td>
+                      {run.weighted_f1 !== null
+                        ? run.weighted_f1.toFixed(3)
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
         </section>
       )}
 

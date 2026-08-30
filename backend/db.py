@@ -102,6 +102,34 @@ def init_db():
             )
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ml_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset_id INTEGER NOT NULL,
+                feature_set_id INTEGER NOT NULL,
+
+                target TEXT NOT NULL,
+                algorithm TEXT NOT NULL,
+                cv_strategy TEXT NOT NULL,
+                cv_folds INTEGER NOT NULL,
+                random_seed INTEGER NOT NULL,
+
+                num_samples INTEGER NOT NULL,
+                num_features INTEGER NOT NULL,
+                num_classes INTEGER NOT NULL,
+
+                accuracy REAL NOT NULL,
+                macro_f1 REAL,
+                weighted_f1 REAL,
+
+                result_json TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+                FOREIGN KEY(dataset_id) REFERENCES datasets(id),
+                FOREIGN KEY(feature_set_id) REFERENCES feature_sets(id)
+            )
+        """)
+
         add_column_if_missing(
           conn,
           "images",

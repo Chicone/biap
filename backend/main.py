@@ -34,7 +34,7 @@ from sklearn.decomposition import PCA
 import umap
 from dataset_importers.bbbc021 import BBBC021Importer
 from dataset_importers.jump import JUMPImporter
-from ml.trainer import train_model, get_available_targets
+from ml.trainer import train_model, get_available_targets, get_ml_runs
 from vision.foundation_models.dinov2 import get_dinov2_model
 
 app = FastAPI()
@@ -746,6 +746,10 @@ async def import_jump(
 @app.get("/datasets/{dataset_id}/machine-learning/targets")
 def get_machine_learning_targets(dataset_id: int):
     return get_available_targets(dataset_id)
+
+@app.get("/datasets/{dataset_id}/machine-learning/runs")
+def list_machine_learning_runs(dataset_id: int):
+    return get_ml_runs(dataset_id)
 
 @app.post("/datasets/{dataset_id}/machine-learning/train")
 def train_machine_learning_model(

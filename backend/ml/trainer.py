@@ -310,6 +310,111 @@ def _load_feature_set_dataset(
     feature_set_record,
   )
 
+def save_ml_run(
+  dataset_id: int,
+  feature_set_id: int,
+  config: dict,
+  result: dict,
+):
+  report = result["classification_report"]
+
+  macro_f1 = report.get(
+    "macro avg",
+    {},
+  ).get("f1-score")
+
+  weighted_f1 = report.get(
+    "weighted avg",
+    {},
+  ).get("f1-score")
+
+  with get_connection() as conn:
+    cursor = conn.execute(
+      """
+      INSERT INTO ml_runs
+      (
+          dataset_id,
+          feature_set_id,
+          target,
+          algorithm,
+          cv_strategy,
+          cv_folds,
+          random_seed,
+          num_samples,
+          num_features,
+          num_classes,
+          accuracy,
+          macro_f1,
+          weighted_f1,
+          result_json
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      """,
+      (
+        dataset_id,
+        feature_set_id,
+        config.get("target", "moa"),
+        config.get("algorithm", "random_forest"),
+        config.get("cv_strategy", "stratified"),
+        result["cross_validation"]["folds"],
+        config.get("random_seed", 42),
+        result["num_samples"],
+        result["num_features"],
+        result["num_classes"],
+        result["accuracy"],
+        macro_f1,
+        weighted_f1,
+        json.dumps(result),
+      ),
+    )
+
+    run_id = cursor.lastrowid
+
+  return run_id
+
+def get_ml_runs(dataset_id: int):
+  with get_connection() as conn:
+    rows = conn.execute(
+      """
+      SELECT
+          ml_runs.id,
+          ml_runs.dataset_id,
+          ml_runs.feature_set_id,
+          feature_sets.name AS feature_set_name,
+
+          ml_runs.target,
+          ml_runs.algorithm,
+          ml_runs.cv_strategy,
+          ml_runs.cv_folds,
+          ml_runs.random_seed,
+
+          ml_runs.num_samples,
+          ml_runs.num_features,
+          ml_runs.num_classes,
+
+          ml_runs.accuracy,
+          ml_runs.macro_f1,
+          ml_runs.weighted_f1,
+
+          ml_runs.created_at
+
+      FROM ml_runs
+
+      JOIN feature_sets
+        ON feature_sets.id = ml_runs.feature_set_id
+
+      WHERE ml_runs.dataset_id = ?
+
+      ORDER BY ml_runs.id DESC
+      """,
+      (dataset_id,),
+    ).fetchall()
+
+  return [
+    dict(row)
+    for row in rows
+  ]
+
 def train_model(dataset_id: int, config: dict):
   algorithm = config.get(
     "algorithm",
@@ -589,7 +694,7 @@ def train_model(dataset_id: int, config: dict):
     )
   ]
 
-  return {
+  result = {
     "dataset_id": dataset_id,
     "feature_set_id": int(feature_set_id),
     "feature_set_name": feature_set_record["name"],
@@ -614,3 +719,14 @@ def train_model(dataset_id: int, config: dict):
     "top_features": feature_importance[:20],
     "image_ids": image_ids,
   }
+
+  run_id = save_ml_run(
+    dataset_id=dataset_id,
+    feature_set_id=int(feature_set_id),
+    config=config,
+    result=result,
+  )
+
+  result["run_id"] = run_id
+
+  return result
