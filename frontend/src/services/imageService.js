@@ -48,14 +48,45 @@ export async function uploadImage(datasetId, file) {
 export async function importFolder(
   datasetId,
   folderPath,
-  datasetName = ""
+  datasetName = "",
+  datasetType = ""
 ) {
-  const normalizedDatasetName = datasetName.trim().toUpperCase();
+  const normalizedDatasetName =
+    datasetName.trim().toUpperCase();
 
-  const importerEndpoint =
+  const normalizedDatasetType =
+    datasetType.trim().toUpperCase();
+
+  let importerEndpoint = "import-folder";
+
+  if (
     normalizedDatasetName === "BBBC021"
-      ? "import-bbbc021"
-      : "import-folder";
+  ) {
+    importerEndpoint = "import-bbbc021";
+  }
+
+  if (
+    normalizedDatasetName.includes("JUMP") ||
+    normalizedDatasetType.includes("JUMP")
+  ) {
+    importerEndpoint = "import-jump";
+  }
+
+  const body = {
+    folder_path: folderPath,
+  };
+
+  if (
+    importerEndpoint === "import-folder"
+  ) {
+    body.max_images = 20;
+  }
+
+  if (
+    importerEndpoint === "import-bbbc021"
+  ) {
+    body.max_images = null;
+  }
 
   const response = await fetch(
     `${API_URL}/datasets/${datasetId}/${importerEndpoint}`,
@@ -64,18 +95,13 @@ export async function importFolder(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        folder_path: folderPath,
-        max_images:
-          normalizedDatasetName === "BBBC021"
-            ? null
-            : 20,
-      }),
+      body: JSON.stringify(body),
     }
   );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => null);
+    const error =
+      await response.json().catch(() => null);
 
     throw new Error(
       typeof error?.detail === "string"

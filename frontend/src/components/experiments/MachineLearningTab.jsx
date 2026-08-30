@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 
 function MachineLearningTab({ activeDataset }) {
   const API_URL = "http://127.0.0.1:8002";
-  const [target, setTarget] = useState("moa");
-  const [algorithm, setAlgorithm] = useState("random_forest");
+  const [target, setTarget] = useState("");
+  const [availableTargets, setAvailableTargets] = useState([]);
+  const [targetsError, setTargetsError] = useState(null);  const [algorithm, setAlgorithm] = useState("random_forest");
   const [featureSets, setFeatureSets] = useState([]);
   const [selectedFeatureSetId, setSelectedFeatureSetId] = useState("");
   const [featureSetsError, setFeatureSetsError] = useState(null);
@@ -19,6 +20,44 @@ function MachineLearningTab({ activeDataset }) {
   const [selectedPredictionImage, setSelectedPredictionImage] = useState(null);
   const [comparisonA, setComparisonA] = useState(null);
   const [comparisonB, setComparisonB] = useState(null);
+
+  async function loadAvailableTargets() {
+    if (!activeDataset) {
+      setAvailableTargets([]);
+      setTarget("");
+      return;
+    }
+
+    setTargetsError(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/machine-learning/targets`
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Failed to load targets"
+        );
+      }
+
+      setAvailableTargets(result);
+
+      setTarget(
+        result.length > 0
+          ? result[0].value
+          : ""
+      );
+    } catch (error) {
+      setTargetsError(error.message);
+      setAvailableTargets([]);
+      setTarget("");
+    }
+  }
 
   async function loadFeatureSets() {
     if (!activeDataset) {
@@ -63,6 +102,7 @@ function MachineLearningTab({ activeDataset }) {
 
   useEffect(() => {
     loadFeatureSets();
+    loadAvailableTargets();
   }, [activeDataset]);
 
 
@@ -142,34 +182,39 @@ function MachineLearningTab({ activeDataset }) {
         <section className="ml-card">
           <h4>Target</h4>
 
-          <div className="ml-option-list">
-            <label>
-              <input
-                type="radio"
-                checked={target === "moa"}
-                onChange={() => setTarget("moa")}
-              />
-              MOA
-            </label>
+          {targetsError && (
+            <p className="ml-field-error">
+              {targetsError}
+            </p>
+          )}
 
-            <label>
-              <input
-                type="radio"
-                checked={target === "compound"}
-                onChange={() => setTarget("compound")}
-              />
-              Compound
-            </label>
+          {availableTargets.length === 0 ? (
+            <p className="ml-empty-message">
+              No supervised learning targets are available
+              for this dataset.
+            </p>
+          ) : (
+            <div className="ml-option-list">
+              {availableTargets.map((targetOption) => (
+                <label key={targetOption.value}>
+                  <input
+                    type="radio"
+                    checked={target === targetOption.value}
+                    onChange={() =>
+                      setTarget(targetOption.value)
+                    }
+                  />
 
-            <label>
-              <input
-                type="radio"
-                checked={target === "concentration"}
-                onChange={() => setTarget("concentration")}
-              />
-              Concentration
-            </label>
-          </div>
+                  {targetOption.label}
+
+                  <span>
+                    {" "}
+                    ({targetOption.num_classes} classes)
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="ml-card">
@@ -244,6 +289,9 @@ function MachineLearningTab({ activeDataset }) {
               onChange={(event) => setAlgorithm(event.target.value)}
             >
               <option value="random_forest">Random Forest</option>
+              <option value="ridge">Ridge Classifier</option>
+              <option value="logistic_regression">Logistic Regression</option>
+              <option value="linear_svm">Linear SVM</option>
             </select>
           </label>
         </section>
@@ -312,7 +360,7 @@ function MachineLearningTab({ activeDataset }) {
       )}
       <Button
         onClick={handleTrainModel}
-        disabled={isTraining || !selectedFeatureSetId}
+        disabled={isTraining || !selectedFeatureSetId || !target}
       >
         {isTraining ? "Evaluating..." : "Evaluate Model"}
       </Button>

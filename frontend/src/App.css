@@ -1804,34 +1804,34 @@ tbody tr:hover {
 }
 
 .feature-panel-combine {
-  display: grid;
-  grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  align-items: end;
 }
 
-.feature-panel-combine .section-label {
-  grid-column: 1 / -1;
+.feature-combine-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.feature-panel-combine button {
-  grid-column: 1 / -1;
-  justify-self: center;
-  white-space: nowrap;
+.feature-combine-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
 }
 
-.feature-panel-combine .section-label {
-  grid-column: 1 / -1;
-  margin-bottom: 0;
+.feature-combine-summary {
+  font-size: 13px;
+  color: #64748b;
 }
 
-.feature-panel-combine .feature-builder-field {
-  margin-bottom: 0;
+.feature-combine-name {
+  max-width: 480px;
 }
 
-.feature-panel-combine button {
-  white-space: nowrap;
+.feature-panel-combine > button {
+  align-self: flex-start;
 }
 
 .foundation-feature-description {

@@ -79,7 +79,8 @@ function ImagesTab({ activeDataset }) {
   await importFolder(
     activeDataset.id,
     folderPath,
-    activeDataset.name
+    activeDataset.name,
+    activeDataset.dataset_type
   );
 
     const updatedImages = await getImages(activeDataset.id);

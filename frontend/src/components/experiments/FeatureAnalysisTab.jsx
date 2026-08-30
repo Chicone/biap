@@ -24,13 +24,13 @@ function FeatureAnalysisTab({ activeDataset }) {
   const [isDeletingFeatureSet, setIsDeletingFeatureSet] = useState(false);
 
   const [foundationFeatureSetName, setFoundationFeatureSetName] = useState("DINOv2 Embeddings v1");
-  const [foundationChannel, setFoundationChannel] = useState("DAPI");
+  const [foundationChannel, setFoundationChannel] = useState("");
+  const [availableChannels, setAvailableChannels] = useState([]);
   const [isGeneratingFoundationFeatures, setIsGeneratingFoundationFeatures] = useState(false);
   const [foundationFeaturesError, setFoundationFeaturesError] = useState(null);
   const [foundationFeaturesResult, setFoundationFeaturesResult] = useState(null);
 
-  const [combineFeatureSetA, setCombineFeatureSetA] = useState("");
-  const [combineFeatureSetB, setCombineFeatureSetB] = useState("");
+  const [selectedFeatureSetIds, setSelectedFeatureSetIds] =  useState([]);
   const [combinedFeatureSetName, setCombinedFeatureSetName] = useState("Handcrafted + DINOv2");
   const [isCombiningFeatureSets, setIsCombiningFeatureSets] = useState(false);
   const [combineFeatureSetsError, setCombineFeatureSetsError] = useState(null);
@@ -152,8 +152,67 @@ function FeatureAnalysisTab({ activeDataset }) {
     }
   }
 
+  async function loadAvailableChannels() {
+    if (!activeDataset) {
+      setAvailableChannels([]);
+      setFoundationChannel("");
+      return;
+    }
+
+    try {
+      const imagesResponse = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/images`
+      );
+
+      if (!imagesResponse.ok) {
+        throw new Error("Failed to load dataset images");
+      }
+
+      const images = await imagesResponse.json();
+
+      if (images.length === 0) {
+        setAvailableChannels([]);
+        setFoundationChannel("");
+        return;
+      }
+
+      const firstImageId = images[0].id;
+
+      const channelsResponse = await fetch(
+        `${API_URL}/images/${firstImageId}/channels`
+      );
+
+      if (!channelsResponse.ok) {
+        throw new Error("Failed to load image channels");
+      }
+
+      const channels = await channelsResponse.json();
+
+      const channelNames = channels.map(
+        (channel) => channel.channel_name
+      );
+
+      setAvailableChannels(channelNames);
+
+      setFoundationChannel(
+        channelNames.length > 0
+          ? channelNames[0]
+          : ""
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load available channels:",
+        error
+      );
+
+      setAvailableChannels([]);
+      setFoundationChannel("");
+    }
+  }
+
   useEffect(() => {
     loadSavedFeatureSets();
+    loadAvailableChannels();
   }, [activeDataset]);
 
   async function handleGenerateDINOv2FeatureSet() {
@@ -199,11 +258,25 @@ function FeatureAnalysisTab({ activeDataset }) {
     }
   }
 
+  function handleToggleFeatureSet(featureSetId) {
+    setSelectedFeatureSetIds((currentIds) => {
+      if (currentIds.includes(featureSetId)) {
+        return currentIds.filter(
+          (id) => id !== featureSetId
+        );
+      }
+
+      return [
+        ...currentIds,
+        featureSetId,
+      ];
+    });
+  }
+
   async function handleCombineFeatureSets() {
     if (
       !activeDataset ||
-      !combineFeatureSetA ||
-      !combineFeatureSetB ||
+      selectedFeatureSetIds.length < 2 ||
       !combinedFeatureSetName.trim()
     ) {
       return;
@@ -223,10 +296,7 @@ function FeatureAnalysisTab({ activeDataset }) {
           },
           body: JSON.stringify({
             name: combinedFeatureSetName.trim(),
-            feature_set_ids: [
-              Number(combineFeatureSetA),
-              Number(combineFeatureSetB),
-            ],
+            feature_set_ids: selectedFeatureSetIds,
           }),
         }
       );
@@ -242,6 +312,7 @@ function FeatureAnalysisTab({ activeDataset }) {
       }
 
       setCombineFeatureSetsResult(result);
+      setSelectedFeatureSetIds([]);
 
       await loadSavedFeatureSets();
     } catch (error) {
@@ -302,17 +373,33 @@ function FeatureAnalysisTab({ activeDataset }) {
     );
   }
 
+  const selectedFeatureSets = savedFeatureSets.filter(
+    (featureSet) =>
+      selectedFeatureSetIds.includes(featureSet.id)
+  );
+
+  const selectedFeatureCount = selectedFeatureSets.reduce(
+    (total, featureSet) =>
+      total + featureSet.num_features,
+    0
+  );
+
   return (
     <div className="workspace-content">
       <div className="feature-analysis-layout">
         <section className="feature-builder-panel feature-panel-handcrafted">
-          <div className="section-label">Feature Set Builder</div>
+          <div className="section-label">
+            Feature Set Builder
+          </div>
 
           <label className="feature-builder-field">
             Feature set name
+
             <input
               value={featureSetName}
-              onChange={(event) => setFeatureSetName(event.target.value)}
+              onChange={(event) =>
+                setFeatureSetName(event.target.value)
+              }
               placeholder="Cell Features v1"
             />
           </label>
@@ -320,16 +407,23 @@ function FeatureAnalysisTab({ activeDataset }) {
           <FeatureBuilderSection title="Feature Sources">
             <div className="feature-source-list">
               {featureSources.map((source) => (
-                <label className="feature-source-option" key={source.key}>
+                <label
+                  className="feature-source-option"
+                  key={source.key}
+                >
                   <input
                     type="checkbox"
                     checked={selectedSources[source.key]}
-                    onChange={() => handleToggleSource(source.key)}
+                    onChange={() =>
+                      handleToggleSource(source.key)
+                    }
                   />
 
                   <div>
                     <strong>{source.label}</strong>
-                    <span>{source.featureCount} features</span>
+                    <span>
+                      {source.featureCount} features
+                    </span>
                   </div>
                 </label>
               ))}
@@ -338,16 +432,27 @@ function FeatureAnalysisTab({ activeDataset }) {
 
           <FeatureBuilderSection title="Feature Selection">
             <div className="feature-source-list">
+
               <label className="feature-source-option">
                 <input
                   type="checkbox"
                   checked={removeConstantFeatures}
-                  onChange={() => setRemoveConstantFeatures(!removeConstantFeatures)}
+                  onChange={() =>
+                    setRemoveConstantFeatures(
+                      !removeConstantFeatures
+                    )
+                  }
                 />
 
                 <div>
-                  <strong>Remove constant features</strong>
-                  <span>Discard numeric columns with only one unique value</span>
+                  <strong>
+                    Remove constant features
+                  </strong>
+
+                  <span>
+                    Discard numeric columns with only one
+                    unique value
+                  </span>
                 </div>
               </label>
 
@@ -355,18 +460,29 @@ function FeatureAnalysisTab({ activeDataset }) {
                 <input
                   type="checkbox"
                   checked={removeCorrelatedFeatures}
-                  onChange={() => setRemoveCorrelatedFeatures(!removeCorrelatedFeatures)}
+                  onChange={() =>
+                    setRemoveCorrelatedFeatures(
+                      !removeCorrelatedFeatures
+                    )
+                  }
                 />
 
                 <div>
-                  <strong>Remove highly correlated features</strong>
-                  <span>Discard redundant numeric columns above threshold</span>
+                  <strong>
+                    Remove highly correlated features
+                  </strong>
+
+                  <span>
+                    Discard redundant numeric columns above
+                    threshold
+                  </span>
                 </div>
               </label>
 
               {removeCorrelatedFeatures && (
                 <label className="feature-builder-field">
                   Correlation threshold
+
                   <input
                     type="number"
                     min="0"
@@ -374,23 +490,29 @@ function FeatureAnalysisTab({ activeDataset }) {
                     step="0.01"
                     value={correlationThreshold}
                     onChange={(event) =>
-                      setCorrelationThreshold(Number(event.target.value))
+                      setCorrelationThreshold(
+                        Number(event.target.value)
+                      )
                     }
                   />
                 </label>
               )}
+
             </div>
           </FeatureBuilderSection>
 
           <FeatureBuilderSection title="Feature Transformation">
             <div className="feature-source-list">
+
               <label className="feature-source-option">
                 <input
                   type="radio"
                   name="scaling-method"
                   value="none"
                   checked={scalingMethod === "none"}
-                  onChange={() => setScalingMethod("none")}
+                  onChange={() =>
+                    setScalingMethod("none")
+                  }
                 />
 
                 <div>
@@ -405,12 +527,16 @@ function FeatureAnalysisTab({ activeDataset }) {
                   name="scaling-method"
                   value="standard"
                   checked={scalingMethod === "standard"}
-                  onChange={() => setScalingMethod("standard")}
+                  onChange={() =>
+                    setScalingMethod("standard")
+                  }
                 />
 
                 <div>
                   <strong>Standard scaling</strong>
-                  <span>Zero mean and unit variance</span>
+                  <span>
+                    Zero mean and unit variance
+                  </span>
                 </div>
               </label>
 
@@ -420,12 +546,16 @@ function FeatureAnalysisTab({ activeDataset }) {
                   name="scaling-method"
                   value="minmax"
                   checked={scalingMethod === "minmax"}
-                  onChange={() => setScalingMethod("minmax")}
+                  onChange={() =>
+                    setScalingMethod("minmax")
+                  }
                 />
 
                 <div>
                   <strong>Min-Max scaling</strong>
-                  <span>Scale numeric features to the 0–1 range</span>
+                  <span>
+                    Scale numeric features to the 0–1 range
+                  </span>
                 </div>
               </label>
 
@@ -435,25 +565,34 @@ function FeatureAnalysisTab({ activeDataset }) {
                   name="scaling-method"
                   value="robust"
                   checked={scalingMethod === "robust"}
-                  onChange={() => setScalingMethod("robust")}
+                  onChange={() =>
+                    setScalingMethod("robust")
+                  }
                 />
 
                 <div>
                   <strong>Robust scaling</strong>
-                  <span>Use median and interquartile range</span>
+                  <span>
+                    Use median and interquartile range
+                  </span>
                 </div>
               </label>
+
             </div>
           </FeatureBuilderSection>
 
           <FeatureBuilderSection title="Dimensionality Reduction">
             <div className="feature-source-list">
+
               <label className="feature-source-option">
                 <input
                   type="radio"
                   name="reduction-method"
                   value="none"
-                  checked={pcaComponents === 0 && umapComponents === 0}
+                  checked={
+                    pcaComponents === 0 &&
+                    umapComponents === 0
+                  }
                   onChange={() => {
                     setPcaComponents(0);
                     setUmapComponents(0);
@@ -462,7 +601,9 @@ function FeatureAnalysisTab({ activeDataset }) {
 
                 <div>
                   <strong>None</strong>
-                  <span>Do not compute dimensionality reduction</span>
+                  <span>
+                    Do not compute dimensionality reduction
+                  </span>
                 </div>
               </label>
 
@@ -480,7 +621,9 @@ function FeatureAnalysisTab({ activeDataset }) {
 
                 <div>
                   <strong>PCA 2D</strong>
-                  <span>Compute pca_1 and pca_2</span>
+                  <span>
+                    Compute pca_1 and pca_2
+                  </span>
                 </div>
               </label>
 
@@ -492,12 +635,20 @@ function FeatureAnalysisTab({ activeDataset }) {
                       name="pca-mode"
                       value="add"
                       checked={pcaMode === "add"}
-                      onChange={() => setPcaMode("add")}
+                      onChange={() =>
+                        setPcaMode("add")
+                      }
                     />
 
                     <div>
-                      <strong>Add PCA columns</strong>
-                      <span>Keep original features and append PCA columns</span>
+                      <strong>
+                        Add PCA columns
+                      </strong>
+
+                      <span>
+                        Keep original features and append
+                        PCA columns
+                      </span>
                     </div>
                   </label>
 
@@ -507,18 +658,27 @@ function FeatureAnalysisTab({ activeDataset }) {
                       name="pca-mode"
                       value="replace"
                       checked={pcaMode === "replace"}
-                      onChange={() => setPcaMode("replace")}
+                      onChange={() =>
+                        setPcaMode("replace")
+                      }
                     />
 
                     <div>
-                      <strong>Replace features with PCA</strong>
-                      <span>Use only PCA columns as reduced features</span>
+                      <strong>
+                        Replace features with PCA
+                      </strong>
+
+                      <span>
+                        Use only PCA columns as reduced
+                        features
+                      </span>
                     </div>
                   </label>
 
                   {scalingMethod === "none" && (
                     <p className="feature-warning">
-                      PCA is usually recommended after Standard scaling.
+                      PCA is usually recommended after
+                      Standard scaling.
                     </p>
                   )}
                 </>
@@ -538,7 +698,9 @@ function FeatureAnalysisTab({ activeDataset }) {
 
                 <div>
                   <strong>UMAP 2D</strong>
-                  <span>Compute umap_1 and umap_2</span>
+                  <span>
+                    Compute umap_1 and umap_2
+                  </span>
                 </div>
               </label>
 
@@ -550,12 +712,20 @@ function FeatureAnalysisTab({ activeDataset }) {
                       name="umap-mode"
                       value="add"
                       checked={umapMode === "add"}
-                      onChange={() => setUmapMode("add")}
+                      onChange={() =>
+                        setUmapMode("add")
+                      }
                     />
 
                     <div>
-                      <strong>Add UMAP columns</strong>
-                      <span>Keep original features and append UMAP columns</span>
+                      <strong>
+                        Add UMAP columns
+                      </strong>
+
+                      <span>
+                        Keep original features and append
+                        UMAP columns
+                      </span>
                     </div>
                   </label>
 
@@ -565,22 +735,32 @@ function FeatureAnalysisTab({ activeDataset }) {
                       name="umap-mode"
                       value="replace"
                       checked={umapMode === "replace"}
-                      onChange={() => setUmapMode("replace")}
+                      onChange={() =>
+                        setUmapMode("replace")
+                      }
                     />
 
                     <div>
-                      <strong>Replace features with UMAP</strong>
-                      <span>Use only UMAP columns as reduced features</span>
+                      <strong>
+                        Replace features with UMAP
+                      </strong>
+
+                      <span>
+                        Use only UMAP columns as reduced
+                        features
+                      </span>
                     </div>
                   </label>
 
                   {scalingMethod === "none" && (
                     <p className="feature-warning">
-                      UMAP usually works better after feature scaling.
+                      UMAP usually works better after
+                      feature scaling.
                     </p>
                   )}
                 </>
               )}
+
             </div>
           </FeatureBuilderSection>
 
@@ -599,7 +779,11 @@ function FeatureAnalysisTab({ activeDataset }) {
                 : "Create Feature Set"}
           </Button>
 
-          {buildError && <p className="error-text">{buildError}</p>}
+          {buildError && (
+            <p className="error-text">
+              {buildError}
+            </p>
+          )}
         </section>
 
         <section className="feature-builder-panel feature-panel-foundation">
@@ -634,11 +818,25 @@ function FeatureAnalysisTab({ activeDataset }) {
               onChange={(event) =>
                 setFoundationChannel(event.target.value)
               }
-              disabled={isGeneratingFoundationFeatures}
+              disabled={
+                isGeneratingFoundationFeatures ||
+                availableChannels.length === 0
+              }
             >
-              <option value="DAPI">DAPI</option>
-              <option value="Tubulin">Tubulin</option>
-              <option value="Actin">Actin</option>
+              {availableChannels.length === 0 ? (
+                <option value="">
+                  No channels available
+                </option>
+              ) : (
+                availableChannels.map((channelName) => (
+                  <option
+                    key={channelName}
+                    value={channelName}
+                  >
+                    {channelName}
+                  </option>
+                ))
+              )}
             </select>
           </label>
 
@@ -684,56 +882,56 @@ function FeatureAnalysisTab({ activeDataset }) {
             Combine Feature Sets
           </div>
 
-          <label className="feature-builder-field">
-            Feature Set A
-            <select
-              value={combineFeatureSetA}
-              onChange={(event) =>
-                setCombineFeatureSetA(event.target.value)
-              }
-              disabled={isCombiningFeatureSets}
-            >
-              <option value="">
-                Select Feature Set
-              </option>
+          <div className="feature-combine-selection">
+            <span className="feature-combine-title">
+              Select Feature Sets
+            </span>
 
-              {savedFeatureSets.map((savedFeatureSet) => (
-                <option
-                  key={savedFeatureSet.id}
-                  value={savedFeatureSet.id}
-                >
-                  {savedFeatureSet.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            {savedFeatureSets.length === 0 ? (
+              <p>No saved Feature Sets available.</p>
+            ) : (
+              <div className="feature-source-list">
+                {savedFeatureSets.map((featureSet) => (
+                  <label
+                    key={featureSet.id}
+                    className="feature-source-option"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedFeatureSetIds.includes(
+                        featureSet.id
+                      )}
+                      onChange={() =>
+                        handleToggleFeatureSet(featureSet.id)
+                      }
+                      disabled={isCombiningFeatureSets}
+                    />
 
-          <label className="feature-builder-field">
-            Feature Set B
-            <select
-              value={combineFeatureSetB}
-              onChange={(event) =>
-                setCombineFeatureSetB(event.target.value)
-              }
-              disabled={isCombiningFeatureSets}
-            >
-              <option value="">
-                Select Feature Set
-              </option>
+                    <div>
+                      <strong>
+                        {featureSet.name}
+                      </strong>
 
-              {savedFeatureSets.map((savedFeatureSet) => (
-                <option
-                  key={savedFeatureSet.id}
-                  value={savedFeatureSet.id}
-                >
-                  {savedFeatureSet.name}
-                </option>
-              ))}
-            </select>
-          </label>
+                      <span>
+                        {featureSet.num_features} features ·{" "}
+                        {featureSet.num_rows} rows
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
 
-          <label className="feature-builder-field">
+            <div className="feature-combine-summary">
+              {selectedFeatureSetIds.length} Feature Sets selected
+              {" · "}
+              {selectedFeatureCount} input features
+            </div>
+          </div>
+
+          <label className="feature-builder-field feature-combine-name">
             Combined Feature Set name
+
             <input
               value={combinedFeatureSetName}
               onChange={(event) =>
@@ -747,15 +945,13 @@ function FeatureAnalysisTab({ activeDataset }) {
             onClick={handleCombineFeatureSets}
             disabled={
               isCombiningFeatureSets ||
-              !combineFeatureSetA ||
-              !combineFeatureSetB ||
-              combineFeatureSetA === combineFeatureSetB ||
+              selectedFeatureSetIds.length < 2 ||
               !combinedFeatureSetName.trim()
             }
           >
             {isCombiningFeatureSets
               ? "Combining..."
-              : "Combine Feature Sets"}
+              : `Combine ${selectedFeatureSetIds.length} Feature Sets`}
           </Button>
 
           {combineFeatureSetsError && (

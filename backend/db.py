@@ -22,6 +22,17 @@ def add_column_if_missing(conn, table_name: str, column_name: str, column_sql: s
 def init_db():
     with get_connection() as conn:
         conn.execute("""
+              CREATE TABLE IF NOT EXISTS experiments (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  domain TEXT NOT NULL,
+                  description TEXT,
+                  status TEXT DEFAULT 'Draft',
+                  updated TEXT DEFAULT CURRENT_TIMESTAMP
+              )
+          """)
+
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS datasets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -31,6 +42,13 @@ def init_db():
                 status TEXT DEFAULT 'Imported'
             )
         """)
+
+        add_column_if_missing(
+          conn,
+          "datasets",
+          "experiment_id",
+          "experiment_id INTEGER",
+        )
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS images (
@@ -99,4 +117,6 @@ def init_db():
         add_column_if_missing(conn, "images", "concentration", "concentration REAL")
         add_column_if_missing(conn, "images", "moa", "moa TEXT")
         add_column_if_missing(conn, "images", "smiles", "smiles TEXT")
-
+        add_column_if_missing(conn, "images", "site", "site INTEGER")
+        add_column_if_missing(conn, "images", "target", "target TEXT")
+        add_column_if_missing(conn, "images", "broad_sample", "broad_sample TEXT")

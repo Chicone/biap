@@ -33,7 +33,8 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.decomposition import PCA
 import umap
 from dataset_importers.bbbc021 import BBBC021Importer
-from ml.trainer import train_model
+from dataset_importers.jump import JUMPImporter
+from ml.trainer import train_model, get_available_targets
 from vision.foundation_models.dinov2 import get_dinov2_model
 
 app = FastAPI()
@@ -85,23 +86,6 @@ class ExperimentCreate(BaseModel):
   domain: str
   description: str | None = None
 
-experiments = [
-    {
-        "id": 1,
-        "name": "Cell morphology pilot",
-        "domain": "Microscopy",
-        "status": "Running",
-        "updated": "Today",
-    },
-    {
-        "id": 2,
-        "name": "Tumour segmentation",
-        "domain": "Histology",
-        "status": "Ready",
-        "updated": "Yesterday",
-    },
-]
-
 class DatasetCreate(BaseModel):
   name: str
   dataset_type: str
@@ -121,6 +105,8 @@ class BBBC021ImportRequest(BaseModel):
   folder_path: str
   max_images: int | None = None
 
+class JUMPImportRequest(BaseModel):
+  folder_path: str
 
 class MachineLearningTrainRequest(BaseModel):
   feature_set_id: int
@@ -304,52 +290,76 @@ def _load_feature_set_as_image_rows(
 
 @app.get("/experiments")
 def get_experiments():
-    return experiments
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM experiments
+            ORDER BY id
+            """
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
 
 @app.get("/experiments/{experiment_id}")
 def get_experiment(experiment_id: int):
-    for experiment in experiments:
-        if experiment["id"] == experiment_id:
-            return experiment
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM experiments
+            WHERE id = ?
+            """,
+            (experiment_id,),
+        ).fetchone()
 
-    raise HTTPException(status_code=404, detail="Experiment not found")
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Experiment not found",
+        )
+
+    return dict(row)
+
 
 @app.post("/experiments")
 def create_experiment(experiment: ExperimentCreate):
-    new_experiment = {
-        "id": len(experiments) + 1,
-        "name": experiment.name,
-        "domain": experiment.domain,
-        "description": experiment.description,
-        "status": "Draft",
-        "updated": "Just now",
-    }
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO experiments
+            (
+                name,
+                domain,
+                description,
+                status
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                experiment.name,
+                experiment.domain,
+                experiment.description,
+                "Draft",
+            ),
+        )
 
-    experiments.append(new_experiment)
-    return new_experiment
+        experiment_id = cursor.lastrowid
 
-@app.get("/experiments")
-def get_experiments():
-    return [
-        {
-            "id": 1,
-            "name": "Cell morphology pilot",
-            "domain": "Microscopy",
-            "status": "Running",
-            "updated": "Today",
-        },
-        {
-            "id": 2,
-            "name": "Tumour segmentation",
-            "domain": "Histology",
-            "status": "Ready",
-            "updated": "Yesterday",
-        },
-    ]
+        row = conn.execute(
+            """
+            SELECT *
+            FROM experiments
+            WHERE id = ?
+            """,
+            (experiment_id,),
+        ).fetchone()
+
+    return dict(row)
 
 @app.get("/experiments/{experiment_id}/datasets")
 def get_datasets(experiment_id: int):
-
     with get_connection() as conn:
         rows = conn.execute(
             """
@@ -360,7 +370,6 @@ def get_datasets(experiment_id: int):
         ).fetchall()
 
     return [dict(row) for row in rows]
-
 
 @app.get("/datasets/{dataset_id}")
 def get_dataset(dataset_id: int):
@@ -698,6 +707,45 @@ async def import_bbbc021(dataset_id: int, request: BBBC021ImportRequest):
         )
 
     return result
+
+@app.post("/datasets/{dataset_id}/import-jump")
+async def import_jump(
+    dataset_id: int,
+    request: JUMPImportRequest,
+):
+    source_folder = Path(
+        request.folder_path
+    )
+
+    if not source_folder.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="JUMP dataset folder not found",
+        )
+
+    importer = JUMPImporter(
+        source_folder
+    )
+
+    try:
+        with get_connection() as conn:
+            result = importer.import_to_database(
+                dataset_id=dataset_id,
+                data_root=DATA_ROOT,
+                conn=conn,
+            )
+
+    except FileNotFoundError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    return result
+
+@app.get("/datasets/{dataset_id}/machine-learning/targets")
+def get_machine_learning_targets(dataset_id: int):
+    return get_available_targets(dataset_id)
 
 @app.post("/datasets/{dataset_id}/machine-learning/train")
 def train_machine_learning_model(

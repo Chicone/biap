@@ -2,6 +2,10 @@ from collections import Counter
 import json
 
 import numpy as np
+from sklearn.linear_model import LogisticRegression, RidgeClassifier
+from sklearn.svm import LinearSVC
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import (
@@ -11,16 +15,64 @@ from sklearn.model_selection import (
 )
 from db import get_connection
 
+TARGET_FIELDS = {
+    "moa": "MOA",
+    "compound": "Compound",
+    "concentration": "Concentration",
+    "target": "Target",
+}
+
+
+def get_available_targets(dataset_id: int):
+  """
+  Return supervised-learning targets that actually contain
+  useful values in the active dataset.
+  """
+
+  with get_connection() as conn:
+    rows = conn.execute(
+      """
+      SELECT
+          moa,
+          compound,
+          concentration,
+          target
+      FROM images
+      WHERE dataset_id = ?
+      """,
+      (dataset_id,),
+    ).fetchall()
+
+  available_targets = []
+
+  for field_name, label in TARGET_FIELDS.items():
+    values = {
+      row[field_name]
+      for row in rows
+      if row[field_name] is not None
+         and row[field_name] != ""
+    }
+
+    # A supervised classification target only makes sense
+    # when at least two distinct classes/values exist.
+    if len(values) >= 2:
+      available_targets.append(
+        {
+          "value": field_name,
+          "label": label,
+          "num_classes": len(values),
+        }
+      )
+
+  return available_targets
+
+
 def _load_feature_set_dataset(
     dataset_id: int,
     feature_set_id: int,
     target_name: str,
 ):
-  allowed_targets = {
-    "moa",
-    "compound",
-    "concentration",
-  }
+  allowed_targets = set(TARGET_FIELDS.keys())
 
   if target_name not in allowed_targets:
     raise ValueError(
@@ -64,7 +116,8 @@ def _load_feature_set_dataset(
         images.well,
         images.moa,
         images.compound,
-        images.concentration
+        images.concentration,
+        images.target
       FROM feature_set_rows
       JOIN images
         ON images.id = feature_set_rows.image_id
@@ -263,11 +316,6 @@ def train_model(dataset_id: int, config: dict):
     "random_forest",
   )
 
-  if algorithm != "random_forest":
-    raise ValueError(
-      f"Unsupported algorithm: {algorithm}"
-    )
-
   feature_set_id = config.get("feature_set_id")
 
   if feature_set_id is None:
@@ -306,12 +354,47 @@ def train_model(dataset_id: int, config: dict):
       "Cross-validation requires at least two folds."
     )
 
-  model = RandomForestClassifier(
-    n_estimators=200,
-    random_state=random_seed,
-    class_weight="balanced",
-    n_jobs=-1,
-  )
+  model_name = config.get("algorithm", "random_forest")
+
+  if model_name == "random_forest":
+    model = RandomForestClassifier(
+      n_estimators=200,
+      random_state=random_seed,
+      class_weight="balanced",
+      n_jobs=-1,
+    )
+
+  elif model_name == "ridge":
+    model = make_pipeline(
+      StandardScaler(),
+      RidgeClassifier(
+        class_weight="balanced",
+      ),
+    )
+
+  elif model_name == "logistic_regression":
+    model = make_pipeline(
+      StandardScaler(),
+      LogisticRegression(
+        max_iter=3000,
+        random_state=random_seed,
+        class_weight="balanced",
+      ),
+    )
+
+  elif model_name == "linear_svm":
+    model = make_pipeline(
+      StandardScaler(),
+      LinearSVC(
+        random_state=random_seed,
+        class_weight="balanced",
+      ),
+    )
+
+  else:
+    raise ValueError(
+      f"Unsupported model: {model_name}"
+    )
 
   labels = sorted(class_counts.keys())
 
@@ -435,7 +518,41 @@ def train_model(dataset_id: int, config: dict):
   # Train the final deployable model on all available samples.
   model.fit(X, y)
 
-  importances = model.feature_importances_
+  # -------------------------------------------------------------
+  # Feature importance
+  # -------------------------------------------------------------
+  #
+  # Random Forest exposes feature_importances_ directly.
+  #
+  # Linear classifiers expose coefficients instead. For
+  # multiclass models we use the mean absolute coefficient
+  # across classes as a simple global importance measure.
+
+  if model_name == "random_forest":
+    importances = model.feature_importances_
+
+  else:
+    classifier = model[-1]
+
+    if hasattr(classifier, "coef_"):
+      coefficients = np.asarray(
+        classifier.coef_,
+        dtype=float,
+      )
+
+      if coefficients.ndim == 1:
+        importances = np.abs(coefficients)
+      else:
+        importances = np.mean(
+          np.abs(coefficients),
+          axis=0,
+        )
+
+    else:
+      importances = np.zeros(
+        len(feature_names),
+        dtype=float,
+      )
 
   feature_importance = sorted(
     [
