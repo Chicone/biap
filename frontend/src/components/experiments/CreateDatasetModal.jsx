@@ -66,6 +66,7 @@ function CreateDatasetModal({ open, onClose, onCreate }) {
               <option>MRI</option>
               <option>CT</option>
               <option>Pathology</option>
+              <option>Antibody</option>
             </select>
           </label>
 

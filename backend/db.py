@@ -36,7 +36,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS datasets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
-                dataset_type TEXT NOT NULL,
+                dataset_type TEXT NOT NULL DEFAULT 'image',
                 description TEXT,
                 image_count INTEGER DEFAULT 0,
                 status TEXT DEFAULT 'Imported'
@@ -73,6 +73,19 @@ def init_db():
                 url TEXT NOT NULL,
                 channel_order INTEGER,
                 FOREIGN KEY(image_id) REFERENCES images(id)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS antibody_samples (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset_id INTEGER NOT NULL,
+                sample_name TEXT NOT NULL,
+                heavy_chain_sequence TEXT,
+                light_chain_sequence TEXT,
+                metadata_json TEXT,
+                targets_json TEXT,
+                FOREIGN KEY(dataset_id) REFERENCES datasets(id)
             )
         """)
 

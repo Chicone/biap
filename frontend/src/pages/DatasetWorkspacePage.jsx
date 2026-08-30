@@ -20,6 +20,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 
+import AntibodySamplesTab from "@/components/experiments/AntibodySamplesTab";
+
 const API_URL = "http://127.0.0.1:8002";
 
 function DatasetWorkspacePage() {
@@ -69,6 +71,9 @@ function DatasetWorkspacePage() {
     );
   }
 
+  const isAntibodyDataset =
+    activeDataset.dataset_type?.toLowerCase() === "antibody";
+
   return (
     <section className="panel">
       <button
@@ -84,22 +89,35 @@ function DatasetWorkspacePage() {
         <CardHeader>
           <CardTitle>{activeDataset.name}</CardTitle>
 
-          <CardDescription>
-            {activeDataset.dataset_type} dataset · Browse images,
-            create annotations, preprocess data and train models.
-          </CardDescription>
+        <CardDescription>
+          {isAntibodyDataset
+            ? "Antibody dataset · Browse samples, build features and train models."
+            : `${activeDataset.dataset_type} dataset · Browse images, create annotations, preprocess data and train models.`}
+        </CardDescription>
         </CardHeader>
 
         <CardContent>
-          <Tabs defaultValue="images">
+          <Tabs defaultValue={isAntibodyDataset ? "samples" : "images"}>
             <TabsList>
-              <TabsTrigger value="images">Images</TabsTrigger>
-              <TabsTrigger value="annotations">
-                Annotations
-              </TabsTrigger>
-              <TabsTrigger value="preprocessing">
-                Preprocessing
-              </TabsTrigger>
+              {isAntibodyDataset ? (
+                <TabsTrigger value="samples">
+                  Samples
+                </TabsTrigger>
+              ) : (
+                <>
+                  <TabsTrigger value="images">
+                    Images
+                  </TabsTrigger>
+
+                  <TabsTrigger value="annotations">
+                    Annotations
+                  </TabsTrigger>
+
+                  <TabsTrigger value="preprocessing">
+                    Preprocessing
+                  </TabsTrigger>
+                </>
+              )}
               <TabsTrigger value="feature-analysis">
                 Feature Analysis
               </TabsTrigger>
@@ -111,17 +129,25 @@ function DatasetWorkspacePage() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="images">
-              <ImagesTab activeDataset={activeDataset} />
-            </TabsContent>
+            {isAntibodyDataset ? (
+              <TabsContent value="samples">
+                <AntibodySamplesTab activeDataset={activeDataset} />
+              </TabsContent>
+            ) : (
+              <>
+                <TabsContent value="images">
+                  <ImagesTab activeDataset={activeDataset} />
+                </TabsContent>
 
-            <TabsContent value="annotations">
-              Annotation workspace coming soon.
-            </TabsContent>
+                <TabsContent value="annotations">
+                  Annotation workspace coming soon.
+                </TabsContent>
 
-            <TabsContent value="preprocessing">
-              Preprocessing workspace coming soon.
-            </TabsContent>
+                <TabsContent value="preprocessing">
+                  Preprocessing workspace coming soon.
+                </TabsContent>
+              </>
+            )}
 
             <TabsContent value="feature-analysis">
               <FeatureAnalysisTab activeDataset={activeDataset} />

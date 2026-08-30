@@ -34,6 +34,7 @@ from sklearn.decomposition import PCA
 import umap
 from dataset_importers.bbbc021 import BBBC021Importer
 from dataset_importers.jump import JUMPImporter
+from dataset_importers.antibody import AntibodyImporter
 from ml.trainer import (
     train_model,
     get_available_targets,
@@ -112,6 +113,9 @@ class BBBC021ImportRequest(BaseModel):
 
 class JUMPImportRequest(BaseModel):
   folder_path: str
+
+class AntibodyImportRequest(BaseModel):
+  csv_path: str
 
 class MachineLearningTrainRequest(BaseModel):
   feature_set_id: int
@@ -749,6 +753,109 @@ async def import_jump(
         )
 
     return result
+
+@app.post("/datasets/{dataset_id}/import-antibodies")
+async def import_antibodies(
+    dataset_id: int,
+    request: AntibodyImportRequest,
+):
+  with get_connection() as conn:
+    dataset_row = conn.execute(
+      """
+      SELECT dataset_type
+      FROM datasets
+      WHERE id = ?
+      """,
+      (dataset_id,),
+    ).fetchone()
+
+
+    if dataset_row is None:
+      raise HTTPException(
+        status_code=404,
+        detail="Dataset not found",
+      )
+
+    if dataset_row["dataset_type"].strip().lower() != "antibody":
+      raise HTTPException(
+        status_code=400,
+        detail="This dataset is not an antibody dataset.",
+      )
+    csv_path = Path(
+        request.csv_path
+    )
+
+    if not csv_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Antibody CSV file not found",
+        )
+
+    importer = AntibodyImporter(
+        csv_path
+    )
+
+    try:
+        with get_connection() as conn:
+            result = importer.import_to_database(
+                dataset_id=dataset_id,
+                data_root=DATA_ROOT,
+                conn=conn,
+            )
+
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    return result
+
+@app.get("/datasets/{dataset_id}/antibodies")
+def get_antibody_samples(dataset_id: int):
+    with get_connection() as conn:
+        dataset_row = conn.execute(
+            """
+            SELECT dataset_type
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+        if dataset_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Dataset not found",
+            )
+
+        if dataset_row["dataset_type"].strip().lower() != "antibody":
+            raise HTTPException(
+                status_code=400,
+                detail="This dataset is not an antibody dataset.",
+            )
+
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                dataset_id,
+                sample_name,
+                heavy_chain_sequence,
+                light_chain_sequence,
+                metadata_json,
+                targets_json
+            FROM antibody_samples
+            WHERE dataset_id = ?
+            ORDER BY id
+            """,
+            (dataset_id,),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 @app.get("/datasets/{dataset_id}/machine-learning/targets")
 def get_machine_learning_targets(dataset_id: int):

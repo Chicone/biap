@@ -200,6 +200,7 @@ th {
 td {
   padding: 16px 0;
   border-top: 1px solid #e2e8f0;
+  text-align: left;
 }
 
 tbody tr {
