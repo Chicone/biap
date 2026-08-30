@@ -160,6 +160,7 @@ def _load_feature_set_dataset(
         "target": record.get(target_name),
         "plate": record.get("plate"),
         "well": record.get("well"),
+        "compound": record.get("compound"),
       },
     )
 
@@ -175,6 +176,7 @@ def _load_feature_set_dataset(
   targets = []
   image_ids = []
   groups = []
+  compound_groups = []
 
   for image_id, image_entry in rows_by_image.items():
     target_value = image_entry["target"]
@@ -271,6 +273,7 @@ def _load_feature_set_dataset(
     targets.append(str(target_value))
     image_ids.append(image_id)
     groups.append(group_name)
+    compound_groups.append(image_entry.get("compound"))
 
   if not aggregated_rows:
     raise ValueError(
@@ -307,6 +310,7 @@ def _load_feature_set_dataset(
     aggregated_feature_names,
     image_ids,
     np.array(groups, dtype=object),
+    np.array(compound_groups, dtype=object),
     feature_set_record,
   )
 
@@ -329,6 +333,33 @@ def save_ml_run(
   ).get("f1-score")
 
   with get_connection() as conn:
+    existing_run = conn.execute(
+      """
+      SELECT id
+      FROM ml_runs
+      WHERE dataset_id = ?
+        AND feature_set_id = ?
+        AND target = ?
+        AND algorithm = ?
+        AND cv_strategy = ?
+        AND cv_folds = ?
+        AND random_seed = ?
+      ORDER BY id DESC
+      LIMIT 1
+      """,
+      (
+        dataset_id,
+        feature_set_id,
+        config.get("target", "moa"),
+        config.get("algorithm", "random_forest"),
+        config.get("cv_strategy", "stratified"),
+        result["cross_validation"]["folds"],
+        config.get("random_seed", 42),
+      ),
+    ).fetchone()
+
+    if existing_run is not None:
+      return existing_run["id"]
     cursor = conn.execute(
       """
       INSERT INTO ml_runs
@@ -415,6 +446,41 @@ def get_ml_runs(dataset_id: int):
     for row in rows
   ]
 
+def delete_ml_run(
+  dataset_id: int,
+  run_id: int,
+):
+  with get_connection() as conn:
+    run = conn.execute(
+      """
+      SELECT id
+      FROM ml_runs
+      WHERE id = ?
+        AND dataset_id = ?
+      """,
+      (run_id, dataset_id),
+    ).fetchone()
+
+    if run is None:
+      raise ValueError(
+        f"ML run {run_id} was not found "
+        f"for dataset {dataset_id}."
+      )
+
+    conn.execute(
+      """
+      DELETE FROM ml_runs
+      WHERE id = ?
+        AND dataset_id = ?
+      """,
+      (run_id, dataset_id),
+    )
+
+  return {
+    "status": "deleted",
+    "run_id": run_id,
+  }
+
 def train_model(dataset_id: int, config: dict):
   algorithm = config.get(
     "algorithm",
@@ -436,6 +502,7 @@ def train_model(dataset_id: int, config: dict):
     feature_names,
     image_ids,
     groups,
+    compound_groups,
     feature_set_record,
   ) = _load_feature_set_dataset(
     dataset_id=dataset_id,
@@ -595,6 +662,74 @@ def train_model(dataset_id: int, config: dict):
     evaluation_name = (
       f"{usable_cv_folds}-fold stratified group "
       "cross-validation by well"
+    )
+
+    num_groups = int(len(unique_groups))
+
+
+  elif cv_strategy == "group_compound":
+    missing_group_indices = [
+      index
+      for index, group in enumerate(compound_groups)
+      if group is None or group == ""
+    ]
+
+    if missing_group_indices:
+      raise ValueError(
+        "Compound-aware cross-validation requires compound "
+        "metadata for every evaluated image."
+      )
+
+    unique_groups = np.unique(compound_groups)
+
+    if len(unique_groups) < 2:
+      raise ValueError(
+        "Compound-aware cross-validation requires at least "
+        "two distinct compounds."
+      )
+
+    groups_per_class = {}
+
+    for class_name in labels:
+      class_groups = np.unique(
+        np.array(compound_groups)[y == class_name]
+      )
+      groups_per_class[class_name] = len(class_groups)
+
+    min_groups_per_class = min(
+      groups_per_class.values()
+    )
+
+    usable_cv_folds = min(
+      requested_cv_folds,
+      len(unique_groups),
+      min_groups_per_class,
+    )
+
+    if usable_cv_folds < 2:
+      raise ValueError(
+        "Each class must contain at least two distinct "
+        "compounds for compound-aware cross-validation."
+      )
+
+    cv = StratifiedGroupKFold(
+      n_splits=usable_cv_folds,
+      shuffle=True,
+      random_state=random_seed,
+    )
+
+    y_pred = cross_val_predict(
+      model,
+      X,
+      y,
+      cv=cv,
+      groups=compound_groups,
+      n_jobs=-1,
+    )
+
+    evaluation_name = (
+      f"{usable_cv_folds}-fold stratified group "
+      "cross-validation by compound"
     )
 
     num_groups = int(len(unique_groups))

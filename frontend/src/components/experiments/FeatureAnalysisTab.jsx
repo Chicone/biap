@@ -24,6 +24,7 @@ function FeatureAnalysisTab({ activeDataset }) {
   const [isDeletingFeatureSet, setIsDeletingFeatureSet] = useState(false);
 
   const [foundationFeatureSetName, setFoundationFeatureSetName] = useState("DINOv2 Embeddings v1");
+  const [handcraftedChannel, setHandcraftedChannel] = useState("");
   const [foundationChannel, setFoundationChannel] = useState("");
   const [availableChannels, setAvailableChannels] = useState([]);
   const [isGeneratingFoundationFeatures, setIsGeneratingFoundationFeatures] = useState(false);
@@ -40,7 +41,7 @@ function FeatureAnalysisTab({ activeDataset }) {
   const [removeCorrelatedFeatures, setRemoveCorrelatedFeatures] = useState(false);
   const [correlationThreshold, setCorrelationThreshold] = useState(0.95);
 
-  const [scalingMethod, setScalingMethod] = useState("none");
+  const [scalingMethod, setScalingMethod] = useState("robust");
   const [pcaComponents, setPcaComponents] = useState(0);
   const [pcaMode, setPcaMode] = useState("add");
   const [umapComponents, setUmapComponents] = useState(0);
@@ -82,6 +83,7 @@ function FeatureAnalysisTab({ activeDataset }) {
           },
           body: JSON.stringify({
             name: featureSetName.trim(),
+            channel: handcraftedChannel.trim() || null,
             morphology: selectedSources.morphology,
             intensity: selectedSources.intensity,
             texture: selectedSources.texture,
@@ -156,6 +158,7 @@ function FeatureAnalysisTab({ activeDataset }) {
     if (!activeDataset) {
       setAvailableChannels([]);
       setFoundationChannel("");
+      setHandcraftedChannel("");
       return;
     }
 
@@ -173,6 +176,8 @@ function FeatureAnalysisTab({ activeDataset }) {
       if (images.length === 0) {
         setAvailableChannels([]);
         setFoundationChannel("");
+        setHandcraftedChannel("");
+
         return;
       }
 
@@ -199,6 +204,11 @@ function FeatureAnalysisTab({ activeDataset }) {
           ? channelNames[0]
           : ""
       );
+      setHandcraftedChannel(
+        channelNames.length > 0
+          ? channelNames[0]
+          : ""
+      );
     } catch (error) {
       console.error(
         "Failed to load available channels:",
@@ -207,6 +217,7 @@ function FeatureAnalysisTab({ activeDataset }) {
 
       setAvailableChannels([]);
       setFoundationChannel("");
+      setHandcraftedChannel("");
     }
   }
 
@@ -402,6 +413,36 @@ function FeatureAnalysisTab({ activeDataset }) {
               }
               placeholder="Cell Features v1"
             />
+          </label>
+
+          <label className="feature-builder-field">
+            Image channel
+
+            <select
+              value={handcraftedChannel}
+              onChange={(event) =>
+                setHandcraftedChannel(event.target.value)
+              }
+              disabled={
+                isBuilding ||
+                availableChannels.length === 0
+              }
+            >
+              {availableChannels.length === 0 ? (
+                <option value="">
+                  No channels available
+                </option>
+              ) : (
+                availableChannels.map((channelName) => (
+                  <option
+                    key={channelName}
+                    value={channelName}
+                  >
+                    {channelName}
+                  </option>
+                ))
+              )}
+            </select>
           </label>
 
           <FeatureBuilderSection title="Feature Sources">

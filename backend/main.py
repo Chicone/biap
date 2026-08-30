@@ -34,7 +34,12 @@ from sklearn.decomposition import PCA
 import umap
 from dataset_importers.bbbc021 import BBBC021Importer
 from dataset_importers.jump import JUMPImporter
-from ml.trainer import train_model, get_available_targets, get_ml_runs
+from ml.trainer import (
+    train_model,
+    get_available_targets,
+    get_ml_runs,
+    delete_ml_run,
+)
 from vision.foundation_models.dinov2 import get_dinov2_model
 
 app = FastAPI()
@@ -116,8 +121,10 @@ class MachineLearningTrainRequest(BaseModel):
   cv_folds: int
   random_seed: int
 
+
 class FeatureSetCreateRequest(BaseModel):
   name: str
+  channel: str | None = None
 
   morphology: bool = True
   intensity: bool = True
@@ -763,6 +770,24 @@ def train_machine_learning_model(
         config=config,
     )
 
+@app.delete(
+    "/datasets/{dataset_id}/machine-learning/runs/{run_id}"
+)
+def remove_machine_learning_run(
+    dataset_id: int,
+    run_id: int,
+):
+    try:
+        return delete_ml_run(
+            dataset_id=dataset_id,
+            run_id=run_id,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        )
+
 @app.get("/datasets/{dataset_id}/images/{image_id}/analysis")
 def analyze_image(
   dataset_id: int,
@@ -910,6 +935,7 @@ def analyze_image_texture(
 @app.get("/datasets/{dataset_id}/features")
 def build_dataset_features(
     dataset_id: int,
+    channel: str | None = None,
     morphology: bool = True,
     intensity: bool = True,
     texture: bool = True,
@@ -1388,6 +1414,7 @@ def create_feature_set(
 
     result = build_dataset_features(
         dataset_id=dataset_id,
+        channel=request.channel,
         morphology=request.morphology,
         intensity=request.intensity,
         texture=request.texture,
@@ -1978,10 +2005,46 @@ def get_image_overlay(
         raise HTTPException(status_code=404, detail="Image not found")
 
     image_record = dict(row)
-    image_path = resolve_image_path(image_record, image_id, channel)
+    image_id = int(image_record["id"])
+
+    if channel:
+      with get_connection() as conn:
+        channel_row = conn.execute(
+          """
+          SELECT filename
+          FROM image_channels
+          WHERE image_id = ?
+            AND LOWER(channel_name) = LOWER(?)
+          """,
+          (
+            image_id,
+            channel,
+          ),
+        ).fetchone()
+
+      if channel_row is None:
+        raise HTTPException(
+          status_code=400,
+          detail=(
+            f'Channel "{channel}" was not found '
+            f"for image {image_id}."
+          ),
+        )
+
+      image_filename = channel_row["filename"]
+    else:
+      image_filename = image_record["filename"]
+
+    image_path = DATA_ROOT / image_filename
+
+    if not image_path.exists():
+      raise HTTPException(
+        status_code=404,
+        detail=f"Image file not found: {image_path}",
+      )
+
     image = load_image(image_path)
     image_array = pil_to_numpy(image)
-
     gray = to_grayscale(image_array)
     binary, threshold = segment_otsu(
       gray,

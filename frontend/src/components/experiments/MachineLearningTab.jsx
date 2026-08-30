@@ -51,10 +51,14 @@ function MachineLearningTab({ activeDataset }) {
 
       setAvailableTargets(result);
 
+      const preferredTarget = result.find(
+        (item) => item.value === "target"
+      );
+
       setTarget(
-        result.length > 0
-          ? result[0].value
-          : ""
+        preferredTarget?.value ??
+        result[0]?.value ??
+        ""
       );
     } catch (error) {
       setTargetsError(error.message);
@@ -149,7 +153,6 @@ function MachineLearningTab({ activeDataset }) {
     setIsTraining(true);
     setTrainingResult(null);
     setTrainingError(null);
-    await loadSavedRuns();
 
     try {
       const response = await fetch(
@@ -185,6 +188,7 @@ function MachineLearningTab({ activeDataset }) {
       }
 
       setTrainingResult(result);
+      await loadSavedRuns();
     } catch (error) {
       setTrainingError(error.message);
     } finally {
@@ -347,6 +351,10 @@ function MachineLearningTab({ activeDataset }) {
                 Stratified K-Fold
               </option>
 
+              <option value="group_compound">
+                Group by compound
+              </option>
+
               <option value="group_well">
                 Well-aware Stratified Group K-Fold
               </option>
@@ -445,6 +453,7 @@ function MachineLearningTab({ activeDataset }) {
                 <th>Accuracy</th>
                 <th>Macro F1</th>
                 <th>Weighted F1</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -520,7 +529,53 @@ function MachineLearningTab({ activeDataset }) {
                       ? run.weighted_f1.toFixed(3)
                       : "—"}
                   </td>
-                </tr>
+
+                  <td>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const confirmed = window.confirm(
+                          `Delete evaluation run #${run.id}?`
+                        );
+
+                        if (!confirmed) {
+                          return;
+                        }
+
+                        try {
+                          const response = await fetch(
+                            `${API_URL}/datasets/${activeDataset.id}/machine-learning/runs/${run.id}`,
+                            {
+                              method: "DELETE",
+                            }
+                          );
+
+                          const result = await response.json();
+
+                          if (!response.ok) {
+                            throw new Error(
+                              typeof result.detail === "string"
+                                ? result.detail
+                                : "Failed to delete ML run"
+                            );
+                          }
+
+                          setSelectedRunIds((currentIds) =>
+                            currentIds.filter((id) => id !== run.id)
+                          );
+
+                          await loadSavedRuns();
+                        } catch (error) {
+                          setSavedRunsError(error.message);
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                  </tr>
               ))}
             </tbody>
           </table>
@@ -549,9 +604,32 @@ function MachineLearningTab({ activeDataset }) {
 
             <tbody>
               {savedRuns
-                .filter((run) =>
-                  selectedRunIds.includes(run.id)
-                )
+                .filter((run) => {
+                  const queries = runFilter
+                    .toLowerCase()
+                    .split(/\s+or\s+/)
+                    .map((query) => query.trim())
+                    .filter(Boolean);
+
+                  if (queries.length === 0) {
+                    return true;
+                  }
+
+                  const searchableText = [
+                    `#${run.id}`,
+                    run.id,
+                    run.feature_set_name,
+                    run.target,
+                    run.algorithm,
+                    run.cv_strategy,
+                  ]
+                    .join(" ")
+                    .toLowerCase();
+
+                  return queries.some((query) =>
+                    searchableText.includes(query)
+                  );
+                })
                 .map((run) => (
                   <tr key={run.id}>
                     <td>#{run.id}</td>
