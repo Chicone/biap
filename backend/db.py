@@ -116,6 +116,25 @@ def init_db():
         """)
 
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS antibody_feature_set_rows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                feature_set_id INTEGER NOT NULL,
+                antibody_sample_id INTEGER NOT NULL,
+                features_json TEXT NOT NULL,
+                FOREIGN KEY(feature_set_id) REFERENCES feature_sets(id),
+                FOREIGN KEY(antibody_sample_id) REFERENCES antibody_samples(id)
+            )
+        """)
+        conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            idx_antibody_feature_set_rows_unique
+            ON antibody_feature_set_rows (
+                feature_set_id,
+                antibody_sample_id
+            )
+        """)
+
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS ml_runs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 dataset_id INTEGER NOT NULL,

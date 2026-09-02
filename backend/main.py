@@ -156,6 +156,9 @@ class CombineFeatureSetsRequest(BaseModel):
   name: str
   feature_set_ids: list[int]
 
+class AntibodyFeatureSetCreateRequest(BaseModel):
+  name: str
+
 def _load_feature_set_as_image_rows(
   dataset_id: int,
   feature_set_id: int,
@@ -298,6 +301,52 @@ def _load_feature_set_as_image_rows(
     "configuration": configuration,
     "rows": image_features,
   }
+
+def compute_sequence_features(sequence: str, prefix: str):
+  sequence = (sequence or "").strip().upper()
+
+  amino_acids = "ACDEFGHIKLMNPQRSTVWY"
+
+  features: dict[str, float] = {
+    f"{prefix}_length": float(len(sequence)),
+  }
+
+  if not sequence:
+    for aa in amino_acids:
+      features[f"{prefix}_freq_{aa}"] = 0.0
+
+    features[f"{prefix}_hydrophobic_fraction"] = 0.0
+    features[f"{prefix}_positive_fraction"] = 0.0
+    features[f"{prefix}_negative_fraction"] = 0.0
+    return features
+
+  length = len(sequence)
+
+  for aa in amino_acids:
+    features[f"{prefix}_freq_{aa}"] = (
+      sequence.count(aa) / length
+    )
+
+  hydrophobic = set("AVILMFWY")
+  positive = set("KRH")
+  negative = set("DE")
+
+  features[f"{prefix}_hydrophobic_fraction"] = (
+    sum(sequence.count(aa) for aa in hydrophobic)
+    / length
+  )
+
+  features[f"{prefix}_positive_fraction"] = (
+    sum(sequence.count(aa) for aa in positive)
+    / length
+  )
+
+  features[f"{prefix}_negative_fraction"] = (
+    sum(sequence.count(aa) for aa in negative)
+    / length
+  )
+
+  return features
 
 @app.get("/experiments")
 def get_experiments():
@@ -2486,4 +2535,182 @@ def delete_feature_set(feature_set_id: int):
         "feature_set_id": feature_set_id,
         "name": feature_set["name"],
         "status": "deleted",
+    }
+
+@app.post("/datasets/{dataset_id}/feature-sets/antibody-sequence")
+def create_antibody_sequence_feature_set(
+    dataset_id: int,
+    request: AntibodyFeatureSetCreateRequest,
+):
+    feature_set_name = request.name.strip()
+
+    if not feature_set_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Feature set name is required.",
+        )
+
+    with get_connection() as conn:
+        dataset_row = conn.execute(
+            """
+            SELECT dataset_type
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+        if dataset_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Dataset not found.",
+            )
+
+        if dataset_row["dataset_type"].strip().lower() != "antibody":
+            raise HTTPException(
+                status_code=400,
+                detail="This dataset is not an antibody dataset.",
+            )
+
+        existing = conn.execute(
+            """
+            SELECT id
+            FROM feature_sets
+            WHERE dataset_id = ?
+            AND LOWER(name) = LOWER(?)
+            """,
+            (
+                dataset_id,
+                feature_set_name,
+            ),
+        ).fetchone()
+
+        if existing is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f'A feature set named "{feature_set_name}" '
+                    "already exists."
+                ),
+            )
+
+        antibody_rows = conn.execute(
+            """
+            SELECT
+                id,
+                heavy_chain_sequence,
+                light_chain_sequence
+            FROM antibody_samples
+            WHERE dataset_id = ?
+            ORDER BY id
+            """,
+            (dataset_id,),
+        ).fetchall()
+
+    if not antibody_rows:
+        raise HTTPException(
+            status_code=400,
+            detail="The dataset contains no antibody samples.",
+        )
+
+    generated_rows = []
+
+    for row in antibody_rows:
+        antibody = dict(row)
+
+        features = {}
+
+        features.update(
+            compute_sequence_features(
+                antibody["heavy_chain_sequence"],
+                "heavy",
+            )
+        )
+
+        features.update(
+            compute_sequence_features(
+                antibody["light_chain_sequence"],
+                "light",
+            )
+        )
+
+        generated_rows.append(
+            (
+                antibody["id"],
+                features,
+            )
+        )
+
+    feature_names = sorted(
+        {
+            feature_name
+            for _, features in generated_rows
+            for feature_name in features.keys()
+        }
+    )
+
+    configuration = {
+        "representation": "sequence_handcrafted",
+    }
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO feature_sets
+            (
+                dataset_id,
+                name,
+                configuration_json,
+                feature_names_json,
+                num_rows,
+                num_features
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset_id,
+                feature_set_name,
+                json.dumps(configuration, sort_keys=True),
+                json.dumps(feature_names),
+                len(generated_rows),
+                len(feature_names),
+            ),
+        )
+
+        feature_set_id = cursor.lastrowid
+
+        conn.executemany(
+            """
+            INSERT INTO antibody_feature_set_rows
+            (
+                feature_set_id,
+                antibody_sample_id,
+                features_json
+            )
+            VALUES (?, ?, ?)
+            """,
+            [
+                (
+                    feature_set_id,
+                    antibody_sample_id,
+                    json.dumps(
+                        features,
+                        sort_keys=True,
+                    ),
+                )
+                for antibody_sample_id, features
+                in generated_rows
+            ],
+        )
+
+    return {
+        "feature_set_id": feature_set_id,
+        "dataset_id": dataset_id,
+        "name": feature_set_name,
+        "configuration": configuration,
+        "feature_names": feature_names,
+        "num_rows": len(generated_rows),
+        "num_features": len(feature_names),
+        "persisted": True,
+        "status": "ready",
     }

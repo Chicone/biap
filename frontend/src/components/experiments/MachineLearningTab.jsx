@@ -604,32 +604,9 @@ function MachineLearningTab({ activeDataset }) {
 
             <tbody>
               {savedRuns
-                .filter((run) => {
-                  const queries = runFilter
-                    .toLowerCase()
-                    .split(/\s+or\s+/)
-                    .map((query) => query.trim())
-                    .filter(Boolean);
-
-                  if (queries.length === 0) {
-                    return true;
-                  }
-
-                  const searchableText = [
-                    `#${run.id}`,
-                    run.id,
-                    run.feature_set_name,
-                    run.target,
-                    run.algorithm,
-                    run.cv_strategy,
-                  ]
-                    .join(" ")
-                    .toLowerCase();
-
-                  return queries.some((query) =>
-                    searchableText.includes(query)
-                  );
-                })
+                .filter((run) =>
+                  selectedRunIds.includes(run.id)
+                )
                 .map((run) => (
                   <tr key={run.id}>
                     <td>#{run.id}</td>

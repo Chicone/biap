@@ -57,6 +57,17 @@ function FeatureAnalysisTab({ activeDataset }) {
     .filter((source) => selectedSources[source.key])
     .reduce((total, source) => total + source.featureCount, 0);
 
+  const isAntibodyDataset =
+  activeDataset?.dataset_type?.toLowerCase() === "antibody";
+  const [antibodyFeatureSetName, setAntibodyFeatureSetName] =
+  useState("Antibody Sequence Baseline");
+  const [isGeneratingAntibodyFeatures, setIsGeneratingAntibodyFeatures] =
+    useState(false);
+  const [antibodyFeaturesError, setAntibodyFeaturesError] =
+    useState(null);
+  const [antibodyFeaturesResult, setAntibodyFeaturesResult] =
+    useState(null);
+
   function handleToggleSource(sourceKey) {
     setSelectedSources((currentSources) => ({
       ...currentSources,
@@ -269,6 +280,49 @@ function FeatureAnalysisTab({ activeDataset }) {
     }
   }
 
+  async function handleGenerateAntibodyFeatureSet() {
+    if (!activeDataset || !antibodyFeatureSetName.trim()) {
+      return;
+    }
+
+    setIsGeneratingAntibodyFeatures(true);
+    setAntibodyFeaturesError(null);
+    setAntibodyFeaturesResult(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/feature-sets/antibody-sequence`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: antibodyFeatureSetName.trim(),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Antibody feature generation failed"
+        );
+      }
+
+      setAntibodyFeaturesResult(result);
+
+      await loadSavedFeatureSets();
+    } catch (error) {
+      setAntibodyFeaturesError(error.message);
+    } finally {
+      setIsGeneratingAntibodyFeatures(false);
+    }
+  }
+
   function handleToggleFeatureSet(featureSetId) {
     setSelectedFeatureSetIds((currentIds) => {
       if (currentIds.includes(featureSetId)) {
@@ -398,622 +452,717 @@ function FeatureAnalysisTab({ activeDataset }) {
   return (
     <div className="workspace-content">
       <div className="feature-analysis-layout">
-        <section className="feature-builder-panel feature-panel-handcrafted">
-          <div className="section-label">
-            Feature Set Builder
-          </div>
+        {!isAntibodyDataset && (
+          <>
+            <section className="feature-builder-panel feature-panel-handcrafted">
+              <div className="section-label">
+                Feature Set Builder
+              </div>
 
-          <label className="feature-builder-field">
-            Feature set name
+              <label className="feature-builder-field">
+                Feature set name
 
-            <input
-              value={featureSetName}
-              onChange={(event) =>
-                setFeatureSetName(event.target.value)
-              }
-              placeholder="Cell Features v1"
-            />
-          </label>
+                <input
+                  value={featureSetName}
+                  onChange={(event) =>
+                    setFeatureSetName(event.target.value)
+                  }
+                  placeholder="Cell Features v1"
+                />
+              </label>
 
-          <label className="feature-builder-field">
-            Image channel
+              <label className="feature-builder-field">
+                Image channel
 
-            <select
-              value={handcraftedChannel}
-              onChange={(event) =>
-                setHandcraftedChannel(event.target.value)
-              }
-              disabled={
-                isBuilding ||
-                availableChannels.length === 0
-              }
-            >
-              {availableChannels.length === 0 ? (
-                <option value="">
-                  No channels available
-                </option>
-              ) : (
-                availableChannels.map((channelName) => (
-                  <option
-                    key={channelName}
-                    value={channelName}
-                  >
-                    {channelName}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-
-          <FeatureBuilderSection title="Feature Sources">
-            <div className="feature-source-list">
-              {featureSources.map((source) => (
-                <label
-                  className="feature-source-option"
-                  key={source.key}
+                <select
+                  value={handcraftedChannel}
+                  onChange={(event) =>
+                    setHandcraftedChannel(event.target.value)
+                  }
+                  disabled={
+                    isBuilding ||
+                    availableChannels.length === 0
+                  }
                 >
-                  <input
-                    type="checkbox"
-                    checked={selectedSources[source.key]}
-                    onChange={() =>
-                      handleToggleSource(source.key)
-                    }
-                  />
-
-                  <div>
-                    <strong>{source.label}</strong>
-                    <span>
-                      {source.featureCount} features
-                    </span>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </FeatureBuilderSection>
-
-          <FeatureBuilderSection title="Feature Selection">
-            <div className="feature-source-list">
-
-              <label className="feature-source-option">
-                <input
-                  type="checkbox"
-                  checked={removeConstantFeatures}
-                  onChange={() =>
-                    setRemoveConstantFeatures(
-                      !removeConstantFeatures
-                    )
-                  }
-                />
-
-                <div>
-                  <strong>
-                    Remove constant features
-                  </strong>
-
-                  <span>
-                    Discard numeric columns with only one
-                    unique value
-                  </span>
-                </div>
-              </label>
-
-              <label className="feature-source-option">
-                <input
-                  type="checkbox"
-                  checked={removeCorrelatedFeatures}
-                  onChange={() =>
-                    setRemoveCorrelatedFeatures(
-                      !removeCorrelatedFeatures
-                    )
-                  }
-                />
-
-                <div>
-                  <strong>
-                    Remove highly correlated features
-                  </strong>
-
-                  <span>
-                    Discard redundant numeric columns above
-                    threshold
-                  </span>
-                </div>
-              </label>
-
-              {removeCorrelatedFeatures && (
-                <label className="feature-builder-field">
-                  Correlation threshold
-
-                  <input
-                    type="number"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={correlationThreshold}
-                    onChange={(event) =>
-                      setCorrelationThreshold(
-                        Number(event.target.value)
-                      )
-                    }
-                  />
-                </label>
-              )}
-
-            </div>
-          </FeatureBuilderSection>
-
-          <FeatureBuilderSection title="Feature Transformation">
-            <div className="feature-source-list">
-
-              <label className="feature-source-option">
-                <input
-                  type="radio"
-                  name="scaling-method"
-                  value="none"
-                  checked={scalingMethod === "none"}
-                  onChange={() =>
-                    setScalingMethod("none")
-                  }
-                />
-
-                <div>
-                  <strong>None</strong>
-                  <span>Keep raw feature values</span>
-                </div>
-              </label>
-
-              <label className="feature-source-option">
-                <input
-                  type="radio"
-                  name="scaling-method"
-                  value="standard"
-                  checked={scalingMethod === "standard"}
-                  onChange={() =>
-                    setScalingMethod("standard")
-                  }
-                />
-
-                <div>
-                  <strong>Standard scaling</strong>
-                  <span>
-                    Zero mean and unit variance
-                  </span>
-                </div>
-              </label>
-
-              <label className="feature-source-option">
-                <input
-                  type="radio"
-                  name="scaling-method"
-                  value="minmax"
-                  checked={scalingMethod === "minmax"}
-                  onChange={() =>
-                    setScalingMethod("minmax")
-                  }
-                />
-
-                <div>
-                  <strong>Min-Max scaling</strong>
-                  <span>
-                    Scale numeric features to the 0–1 range
-                  </span>
-                </div>
-              </label>
-
-              <label className="feature-source-option">
-                <input
-                  type="radio"
-                  name="scaling-method"
-                  value="robust"
-                  checked={scalingMethod === "robust"}
-                  onChange={() =>
-                    setScalingMethod("robust")
-                  }
-                />
-
-                <div>
-                  <strong>Robust scaling</strong>
-                  <span>
-                    Use median and interquartile range
-                  </span>
-                </div>
-              </label>
-
-            </div>
-          </FeatureBuilderSection>
-
-          <FeatureBuilderSection title="Dimensionality Reduction">
-            <div className="feature-source-list">
-
-              <label className="feature-source-option">
-                <input
-                  type="radio"
-                  name="reduction-method"
-                  value="none"
-                  checked={
-                    pcaComponents === 0 &&
-                    umapComponents === 0
-                  }
-                  onChange={() => {
-                    setPcaComponents(0);
-                    setUmapComponents(0);
-                  }}
-                />
-
-                <div>
-                  <strong>None</strong>
-                  <span>
-                    Do not compute dimensionality reduction
-                  </span>
-                </div>
-              </label>
-
-              <label className="feature-source-option">
-                <input
-                  type="radio"
-                  name="reduction-method"
-                  value="pca"
-                  checked={pcaComponents === 2}
-                  onChange={() => {
-                    setPcaComponents(2);
-                    setUmapComponents(0);
-                  }}
-                />
-
-                <div>
-                  <strong>PCA 2D</strong>
-                  <span>
-                    Compute pca_1 and pca_2
-                  </span>
-                </div>
-              </label>
-
-              {pcaComponents > 0 && (
-                <>
-                  <label className="feature-source-option">
-                    <input
-                      type="radio"
-                      name="pca-mode"
-                      value="add"
-                      checked={pcaMode === "add"}
-                      onChange={() =>
-                        setPcaMode("add")
-                      }
-                    />
-
-                    <div>
-                      <strong>
-                        Add PCA columns
-                      </strong>
-
-                      <span>
-                        Keep original features and append
-                        PCA columns
-                      </span>
-                    </div>
-                  </label>
-
-                  <label className="feature-source-option">
-                    <input
-                      type="radio"
-                      name="pca-mode"
-                      value="replace"
-                      checked={pcaMode === "replace"}
-                      onChange={() =>
-                        setPcaMode("replace")
-                      }
-                    />
-
-                    <div>
-                      <strong>
-                        Replace features with PCA
-                      </strong>
-
-                      <span>
-                        Use only PCA columns as reduced
-                        features
-                      </span>
-                    </div>
-                  </label>
-
-                  {scalingMethod === "none" && (
-                    <p className="feature-warning">
-                      PCA is usually recommended after
-                      Standard scaling.
-                    </p>
+                  {availableChannels.length === 0 ? (
+                    <option value="">
+                      No channels available
+                    </option>
+                  ) : (
+                    availableChannels.map((channelName) => (
+                      <option
+                        key={channelName}
+                        value={channelName}
+                      >
+                        {channelName}
+                      </option>
+                    ))
                   )}
-                </>
-              )}
-
-              <label className="feature-source-option">
-                <input
-                  type="radio"
-                  name="reduction-method"
-                  value="umap"
-                  checked={umapComponents === 2}
-                  onChange={() => {
-                    setUmapComponents(2);
-                    setPcaComponents(0);
-                  }}
-                />
-
-                <div>
-                  <strong>UMAP 2D</strong>
-                  <span>
-                    Compute umap_1 and umap_2
-                  </span>
-                </div>
+                </select>
               </label>
 
-              {umapComponents > 0 && (
-                <>
+              <FeatureBuilderSection title="Feature Sources">
+                <div className="feature-source-list">
+                  {featureSources.map((source) => (
+                    <label
+                      className="feature-source-option"
+                      key={source.key}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedSources[source.key]}
+                        onChange={() =>
+                          handleToggleSource(source.key)
+                        }
+                      />
+
+                      <div>
+                        <strong>{source.label}</strong>
+                        <span>
+                          {source.featureCount} features
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </FeatureBuilderSection>
+
+              <FeatureBuilderSection title="Feature Selection">
+                <div className="feature-source-list">
+
                   <label className="feature-source-option">
-                    <input
-                      type="radio"
-                      name="umap-mode"
-                      value="add"
-                      checked={umapMode === "add"}
-                      onChange={() =>
-                        setUmapMode("add")
-                      }
-                    />
-
-                    <div>
-                      <strong>
-                        Add UMAP columns
-                      </strong>
-
-                      <span>
-                        Keep original features and append
-                        UMAP columns
-                      </span>
-                    </div>
-                  </label>
-
-                  <label className="feature-source-option">
-                    <input
-                      type="radio"
-                      name="umap-mode"
-                      value="replace"
-                      checked={umapMode === "replace"}
-                      onChange={() =>
-                        setUmapMode("replace")
-                      }
-                    />
-
-                    <div>
-                      <strong>
-                        Replace features with UMAP
-                      </strong>
-
-                      <span>
-                        Use only UMAP columns as reduced
-                        features
-                      </span>
-                    </div>
-                  </label>
-
-                  {scalingMethod === "none" && (
-                    <p className="feature-warning">
-                      UMAP usually works better after
-                      feature scaling.
-                    </p>
-                  )}
-                </>
-              )}
-
-            </div>
-          </FeatureBuilderSection>
-
-          <Button
-            onClick={handleCreateFeatureSet}
-            disabled={
-              isBuilding ||
-              !featureSetName.trim() ||
-              totalSelectedFeatures === 0
-            }
-          >
-            {isBuilding
-              ? "Creating..."
-              : featureSet
-                ? "Rebuild Feature Set"
-                : "Create Feature Set"}
-          </Button>
-
-          {buildError && (
-            <p className="error-text">
-              {buildError}
-            </p>
-          )}
-        </section>
-
-        <section className="feature-builder-panel feature-panel-foundation">
-          <div className="section-label">
-            Foundation Model Features
-          </div>
-
-          <label className="feature-builder-field">
-            Model
-            <input
-              value="DINOv2 ViT-B/14"
-              disabled
-            />
-          </label>
-
-          <label className="feature-builder-field">
-            Feature set name
-            <input
-              value={foundationFeatureSetName}
-              onChange={(event) =>
-                setFoundationFeatureSetName(event.target.value)
-              }
-              disabled={isGeneratingFoundationFeatures}
-              placeholder="DINOv2 Embeddings v1"
-            />
-          </label>
-
-          <label className="feature-builder-field">
-            Image channel
-            <select
-              value={foundationChannel}
-              onChange={(event) =>
-                setFoundationChannel(event.target.value)
-              }
-              disabled={
-                isGeneratingFoundationFeatures ||
-                availableChannels.length === 0
-              }
-            >
-              {availableChannels.length === 0 ? (
-                <option value="">
-                  No channels available
-                </option>
-              ) : (
-                availableChannels.map((channelName) => (
-                  <option
-                    key={channelName}
-                    value={channelName}
-                  >
-                    {channelName}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-
-          <p className="foundation-feature-description">
-            Generates one 768-dimensional DINOv2 embedding
-            for each image using the selected channel.
-          </p>
-
-          <Button
-            onClick={handleGenerateDINOv2FeatureSet}
-            disabled={
-              isGeneratingFoundationFeatures ||
-              !foundationFeatureSetName.trim()
-            }
-          >
-            {isGeneratingFoundationFeatures
-              ? "Generating Embeddings..."
-              : "Generate DINOv2 Feature Set"}
-          </Button>
-
-          {foundationFeaturesError && (
-            <p className="error-text">
-              {foundationFeaturesError}
-            </p>
-          )}
-
-          {foundationFeaturesResult && (
-            <div className="foundation-feature-result">
-              <strong>
-                {foundationFeaturesResult.name}
-              </strong>
-
-              <span>
-                {foundationFeaturesResult.num_rows} images ·{" "}
-                {foundationFeaturesResult.num_features} embedding features
-              </span>
-            </div>
-          )}
-        </section>
-
-        <section className="feature-builder-panel feature-panel-combine">
-          <div className="section-label">
-            Combine Feature Sets
-          </div>
-
-          <div className="feature-combine-selection">
-            <span className="feature-combine-title">
-              Select Feature Sets
-            </span>
-
-            {savedFeatureSets.length === 0 ? (
-              <p>No saved Feature Sets available.</p>
-            ) : (
-              <div className="feature-source-list">
-                {savedFeatureSets.map((featureSet) => (
-                  <label
-                    key={featureSet.id}
-                    className="feature-source-option"
-                  >
                     <input
                       type="checkbox"
-                      checked={selectedFeatureSetIds.includes(
-                        featureSet.id
-                      )}
+                      checked={removeConstantFeatures}
                       onChange={() =>
-                        handleToggleFeatureSet(featureSet.id)
+                        setRemoveConstantFeatures(
+                          !removeConstantFeatures
+                        )
                       }
-                      disabled={isCombiningFeatureSets}
                     />
 
                     <div>
                       <strong>
-                        {featureSet.name}
+                        Remove constant features
                       </strong>
 
                       <span>
-                        {featureSet.num_features} features ·{" "}
-                        {featureSet.num_rows} rows
+                        Discard numeric columns with only one
+                        unique value
                       </span>
                     </div>
                   </label>
-                ))}
+
+                  <label className="feature-source-option">
+                    <input
+                      type="checkbox"
+                      checked={removeCorrelatedFeatures}
+                      onChange={() =>
+                        setRemoveCorrelatedFeatures(
+                          !removeCorrelatedFeatures
+                        )
+                      }
+                    />
+
+                    <div>
+                      <strong>
+                        Remove highly correlated features
+                      </strong>
+
+                      <span>
+                        Discard redundant numeric columns above
+                        threshold
+                      </span>
+                    </div>
+                  </label>
+
+                  {removeCorrelatedFeatures && (
+                    <label className="feature-builder-field">
+                      Correlation threshold
+
+                      <input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={correlationThreshold}
+                        onChange={(event) =>
+                          setCorrelationThreshold(
+                            Number(event.target.value)
+                          )
+                        }
+                      />
+                    </label>
+                  )}
+
+                </div>
+              </FeatureBuilderSection>
+
+              <FeatureBuilderSection title="Feature Transformation">
+                <div className="feature-source-list">
+
+                  <label className="feature-source-option">
+                    <input
+                      type="radio"
+                      name="scaling-method"
+                      value="none"
+                      checked={scalingMethod === "none"}
+                      onChange={() =>
+                        setScalingMethod("none")
+                      }
+                    />
+
+                    <div>
+                      <strong>None</strong>
+                      <span>Keep raw feature values</span>
+                    </div>
+                  </label>
+
+                  <label className="feature-source-option">
+                    <input
+                      type="radio"
+                      name="scaling-method"
+                      value="standard"
+                      checked={scalingMethod === "standard"}
+                      onChange={() =>
+                        setScalingMethod("standard")
+                      }
+                    />
+
+                    <div>
+                      <strong>Standard scaling</strong>
+                      <span>
+                        Zero mean and unit variance
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="feature-source-option">
+                    <input
+                      type="radio"
+                      name="scaling-method"
+                      value="minmax"
+                      checked={scalingMethod === "minmax"}
+                      onChange={() =>
+                        setScalingMethod("minmax")
+                      }
+                    />
+
+                    <div>
+                      <strong>Min-Max scaling</strong>
+                      <span>
+                        Scale numeric features to the 0–1 range
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="feature-source-option">
+                    <input
+                      type="radio"
+                      name="scaling-method"
+                      value="robust"
+                      checked={scalingMethod === "robust"}
+                      onChange={() =>
+                        setScalingMethod("robust")
+                      }
+                    />
+
+                    <div>
+                      <strong>Robust scaling</strong>
+                      <span>
+                        Use median and interquartile range
+                      </span>
+                    </div>
+                  </label>
+
+                </div>
+              </FeatureBuilderSection>
+
+              <FeatureBuilderSection title="Dimensionality Reduction">
+                <div className="feature-source-list">
+
+                  <label className="feature-source-option">
+                    <input
+                      type="radio"
+                      name="reduction-method"
+                      value="none"
+                      checked={
+                        pcaComponents === 0 &&
+                        umapComponents === 0
+                      }
+                      onChange={() => {
+                        setPcaComponents(0);
+                        setUmapComponents(0);
+                      }}
+                    />
+
+                    <div>
+                      <strong>None</strong>
+                      <span>
+                        Do not compute dimensionality reduction
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="feature-source-option">
+                    <input
+                      type="radio"
+                      name="reduction-method"
+                      value="pca"
+                      checked={pcaComponents === 2}
+                      onChange={() => {
+                        setPcaComponents(2);
+                        setUmapComponents(0);
+                      }}
+                    />
+
+                    <div>
+                      <strong>PCA 2D</strong>
+                      <span>
+                        Compute pca_1 and pca_2
+                      </span>
+                    </div>
+                  </label>
+
+                  {pcaComponents > 0 && (
+                    <>
+                      <label className="feature-source-option">
+                        <input
+                          type="radio"
+                          name="pca-mode"
+                          value="add"
+                          checked={pcaMode === "add"}
+                          onChange={() =>
+                            setPcaMode("add")
+                          }
+                        />
+
+                        <div>
+                          <strong>
+                            Add PCA columns
+                          </strong>
+
+                          <span>
+                            Keep original features and append
+                            PCA columns
+                          </span>
+                        </div>
+                      </label>
+
+                      <label className="feature-source-option">
+                        <input
+                          type="radio"
+                          name="pca-mode"
+                          value="replace"
+                          checked={pcaMode === "replace"}
+                          onChange={() =>
+                            setPcaMode("replace")
+                          }
+                        />
+
+                        <div>
+                          <strong>
+                            Replace features with PCA
+                          </strong>
+
+                          <span>
+                            Use only PCA columns as reduced
+                            features
+                          </span>
+                        </div>
+                      </label>
+
+                      {scalingMethod === "none" && (
+                        <p className="feature-warning">
+                          PCA is usually recommended after
+                          Standard scaling.
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  <label className="feature-source-option">
+                    <input
+                      type="radio"
+                      name="reduction-method"
+                      value="umap"
+                      checked={umapComponents === 2}
+                      onChange={() => {
+                        setUmapComponents(2);
+                        setPcaComponents(0);
+                      }}
+                    />
+
+                    <div>
+                      <strong>UMAP 2D</strong>
+                      <span>
+                        Compute umap_1 and umap_2
+                      </span>
+                    </div>
+                  </label>
+
+                  {umapComponents > 0 && (
+                    <>
+                      <label className="feature-source-option">
+                        <input
+                          type="radio"
+                          name="umap-mode"
+                          value="add"
+                          checked={umapMode === "add"}
+                          onChange={() =>
+                            setUmapMode("add")
+                          }
+                        />
+
+                        <div>
+                          <strong>
+                            Add UMAP columns
+                          </strong>
+
+                          <span>
+                            Keep original features and append
+                            UMAP columns
+                          </span>
+                        </div>
+                      </label>
+
+                      <label className="feature-source-option">
+                        <input
+                          type="radio"
+                          name="umap-mode"
+                          value="replace"
+                          checked={umapMode === "replace"}
+                          onChange={() =>
+                            setUmapMode("replace")
+                          }
+                        />
+
+                        <div>
+                          <strong>
+                            Replace features with UMAP
+                          </strong>
+
+                          <span>
+                            Use only UMAP columns as reduced
+                            features
+                          </span>
+                        </div>
+                      </label>
+
+                      {scalingMethod === "none" && (
+                        <p className="feature-warning">
+                          UMAP usually works better after
+                          feature scaling.
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                </div>
+              </FeatureBuilderSection>
+
+              <Button
+                onClick={handleCreateFeatureSet}
+                disabled={
+                  isBuilding ||
+                  !featureSetName.trim() ||
+                  totalSelectedFeatures === 0
+                }
+              >
+                {isBuilding
+                  ? "Creating..."
+                  : featureSet
+                    ? "Rebuild Feature Set"
+                    : "Create Feature Set"}
+              </Button>
+
+              {buildError && (
+                <p className="error-text">
+                  {buildError}
+                </p>
+              )}
+            </section>
+          </>
+        )}
+
+      {isAntibodyDataset && (
+        <section className="feature-builder-panel feature-panel-handcrafted">
+          {isAntibodyDataset ? (
+            <>
+              <div className="section-label">
+                Antibody Sequence Features
               </div>
-            )}
 
-            <div className="feature-combine-summary">
-              {selectedFeatureSetIds.length} Feature Sets selected
-              {" · "}
-              {selectedFeatureCount} input features
-            </div>
-          </div>
+              <label className="feature-builder-field">
+                Feature set name
 
-          <label className="feature-builder-field feature-combine-name">
-            Combined Feature Set name
+                <input
+                  value={antibodyFeatureSetName}
+                  onChange={(event) =>
+                    setAntibodyFeatureSetName(event.target.value)
+                  }
+                  disabled={isGeneratingAntibodyFeatures}
+                  placeholder="Antibody Sequence Baseline"
+                />
+              </label>
 
-            <input
-              value={combinedFeatureSetName}
-              onChange={(event) =>
-                setCombinedFeatureSetName(event.target.value)
-              }
-              disabled={isCombiningFeatureSets}
-            />
-          </label>
+              <p className="foundation-feature-description">
+                Generates interpretable sequence-derived features from
+                the heavy and light chains of each antibody sample.
+              </p>
 
-          <Button
-            onClick={handleCombineFeatureSets}
-            disabled={
-              isCombiningFeatureSets ||
-              selectedFeatureSetIds.length < 2 ||
-              !combinedFeatureSetName.trim()
-            }
-          >
-            {isCombiningFeatureSets
-              ? "Combining..."
-              : `Combine ${selectedFeatureSetIds.length} Feature Sets`}
-          </Button>
+              <Button
+                onClick={handleGenerateAntibodyFeatureSet}
+                disabled={
+                  isGeneratingAntibodyFeatures ||
+                  !antibodyFeatureSetName.trim()
+                }
+              >
+                {isGeneratingAntibodyFeatures
+                  ? "Generating Features..."
+                  : "Generate Sequence Feature Set"}
+              </Button>
 
-          {combineFeatureSetsError && (
-            <p className="error-text">
-              {combineFeatureSetsError}
-            </p>
-          )}
+              {antibodyFeaturesError && (
+                <p className="error-text">
+                  {antibodyFeaturesError}
+                </p>
+              )}
 
-          {combineFeatureSetsResult && (
-            <div className="foundation-feature-result">
-              <strong>
-                {combineFeatureSetsResult.name}
-              </strong>
-
-              <span>
-                {combineFeatureSetsResult.num_rows} images ·{" "}
-                {combineFeatureSetsResult.num_features} features
-              </span>
-            </div>
+              {antibodyFeaturesResult && (
+                <div className="foundation-feature-result">
+                  <strong>{antibodyFeaturesResult.name}</strong>
+                  <span>
+                    {antibodyFeaturesResult.num_rows} antibodies ·{" "}
+                    {antibodyFeaturesResult.num_features} features
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* your ENTIRE existing handcrafted builder content */}
+            </>
           )}
         </section>
+      )}
+
+        {!isAntibodyDataset && (
+          <section className="feature-builder-panel feature-panel-foundation">
+            <div className="section-label">
+              Foundation Model Features
+            </div>
+
+            <label className="feature-builder-field">
+              Model
+              <input
+                value="DINOv2 ViT-B/14"
+                disabled
+              />
+            </label>
+
+            <label className="feature-builder-field">
+              Feature set name
+              <input
+                value={foundationFeatureSetName}
+                onChange={(event) =>
+                  setFoundationFeatureSetName(event.target.value)
+                }
+                disabled={isGeneratingFoundationFeatures}
+                placeholder="DINOv2 Embeddings v1"
+              />
+            </label>
+
+            <label className="feature-builder-field">
+              Image channel
+              <select
+                value={foundationChannel}
+                onChange={(event) =>
+                  setFoundationChannel(event.target.value)
+                }
+                disabled={
+                  isGeneratingFoundationFeatures ||
+                  availableChannels.length === 0
+                }
+              >
+                {availableChannels.length === 0 ? (
+                  <option value="">
+                    No channels available
+                  </option>
+                ) : (
+                  availableChannels.map((channelName) => (
+                    <option
+                      key={channelName}
+                      value={channelName}
+                    >
+                      {channelName}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+
+            <p className="foundation-feature-description">
+              Generates one 768-dimensional DINOv2 embedding
+              for each image using the selected channel.
+            </p>
+
+            <Button
+              onClick={handleGenerateDINOv2FeatureSet}
+              disabled={
+                isGeneratingFoundationFeatures ||
+                !foundationFeatureSetName.trim()
+              }
+            >
+              {isGeneratingFoundationFeatures
+                ? "Generating Embeddings..."
+                : "Generate DINOv2 Feature Set"}
+            </Button>
+
+            {foundationFeaturesError && (
+              <p className="error-text">
+                {foundationFeaturesError}
+              </p>
+            )}
+
+            {foundationFeaturesResult && (
+              <div className="foundation-feature-result">
+                <strong>
+                  {foundationFeaturesResult.name}
+                </strong>
+
+                <span>
+                  {foundationFeaturesResult.num_rows} images ·{" "}
+                  {foundationFeaturesResult.num_features} embedding features
+                </span>
+              </div>
+            )}
+          </section>
+        )}
+
+        {!isAntibodyDataset && (
+          <section className="feature-builder-panel feature-panel-combine">
+            <div className="section-label">
+              Combine Feature Sets
+            </div>
+
+            <div className="feature-combine-selection">
+              <span className="feature-combine-title">
+                Select Feature Sets
+              </span>
+
+              {savedFeatureSets.length === 0 ? (
+                <p>No saved Feature Sets available.</p>
+              ) : (
+                <div className="feature-source-list">
+                  {savedFeatureSets.map((featureSet) => (
+                    <label
+                      key={featureSet.id}
+                      className="feature-source-option"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedFeatureSetIds.includes(
+                          featureSet.id
+                        )}
+                        onChange={() =>
+                          handleToggleFeatureSet(featureSet.id)
+                        }
+                        disabled={isCombiningFeatureSets}
+                      />
+
+                      <div>
+                        <strong>
+                          {featureSet.name}
+                        </strong>
+
+                        <span>
+                          {featureSet.num_features} features ·{" "}
+                          {featureSet.num_rows} rows
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div className="feature-combine-summary">
+                {selectedFeatureSetIds.length} Feature Sets selected
+                {" · "}
+                {selectedFeatureCount} input features
+              </div>
+            </div>
+
+            <label className="feature-builder-field feature-combine-name">
+              Combined Feature Set name
+
+              <input
+                value={combinedFeatureSetName}
+                onChange={(event) =>
+                  setCombinedFeatureSetName(event.target.value)
+                }
+                disabled={isCombiningFeatureSets}
+              />
+            </label>
+
+            <Button
+              onClick={handleCombineFeatureSets}
+              disabled={
+                isCombiningFeatureSets ||
+                selectedFeatureSetIds.length < 2 ||
+                !combinedFeatureSetName.trim()
+              }
+            >
+              {isCombiningFeatureSets
+                ? "Combining..."
+                : `Combine ${selectedFeatureSetIds.length} Feature Sets`}
+            </Button>
+
+            {combineFeatureSetsError && (
+              <p className="error-text">
+                {combineFeatureSetsError}
+              </p>
+            )}
+
+            {combineFeatureSetsResult && (
+              <div className="foundation-feature-result">
+                <strong>
+                  {combineFeatureSetsResult.name}
+                </strong>
+
+                <span>
+                  {combineFeatureSetsResult.num_rows} images ·{" "}
+                  {combineFeatureSetsResult.num_features} features
+                </span>
+              </div>
+            )}
+          </section>
+        )}
+
+        {isAntibodyDataset && (
+          <section className="feature-builder-panel feature-panel-foundation">
+            <div className="section-label">
+              Foundation Model Features
+            </div>
+
+            <label className="feature-builder-field">
+              Model
+
+              <input
+                value="ESM"
+                disabled
+              />
+            </label>
+
+            <p className="foundation-feature-description">
+              Protein language model embeddings for antibody sequences.
+            </p>
+
+            <Button disabled>
+              Generate ESM Feature Set
+            </Button>
+          </section>
+        )}
 
         <section className="feature-builder-panel feature-panel-saved">
           <div className="section-label">Saved Feature Sets</div>
