@@ -67,6 +67,17 @@ function FeatureAnalysisTab({ activeDataset }) {
     useState(null);
   const [antibodyFeaturesResult, setAntibodyFeaturesResult] =
     useState(null);
+  const [esmFeatureSetName, setEsmFeatureSetName] =
+  useState("ESM-2 650M VH+VL Embeddings");
+
+  const [isGeneratingEsmFeatures, setIsGeneratingEsmFeatures] =
+    useState(false);
+
+  const [esmFeaturesError, setEsmFeaturesError] =
+    useState(null);
+
+  const [esmFeaturesResult, setEsmFeaturesResult] =
+    useState(null);
 
   function handleToggleSource(sourceKey) {
     setSelectedSources((currentSources) => ({
@@ -320,6 +331,49 @@ function FeatureAnalysisTab({ activeDataset }) {
       setAntibodyFeaturesError(error.message);
     } finally {
       setIsGeneratingAntibodyFeatures(false);
+    }
+  }
+
+  async function handleGenerateEsmFeatureSet() {
+    if (!activeDataset || !esmFeatureSetName.trim()) {
+      return;
+    }
+
+    setIsGeneratingEsmFeatures(true);
+    setEsmFeaturesError(null);
+    setEsmFeaturesResult(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/datasets/${activeDataset.id}/feature-sets/antibody-esm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: esmFeatureSetName.trim(),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "ESM feature generation failed"
+        );
+      }
+
+      setEsmFeaturesResult(result);
+
+      await loadSavedFeatureSets();
+    } catch (error) {
+      setEsmFeaturesError(error.message);
+    } finally {
+      setIsGeneratingEsmFeatures(false);
     }
   }
 
@@ -885,64 +939,124 @@ function FeatureAnalysisTab({ activeDataset }) {
           </>
         )}
 
+     {isAntibodyDataset && (
+      <section className="feature-builder-panel feature-panel-handcrafted">
+        <div className="section-label">
+          Antibody Sequence Features
+        </div>
+
+        <label className="feature-builder-field">
+          Feature set name
+
+          <input
+            value={antibodyFeatureSetName}
+            onChange={(event) =>
+              setAntibodyFeatureSetName(event.target.value)
+            }
+            disabled={isGeneratingAntibodyFeatures}
+          />
+        </label>
+
+        <p className="foundation-feature-description">
+          Generates interpretable VH and VL sequence features:
+          amino-acid frequencies, sequence length, hydrophobicity
+          and charge fractions.
+        </p>
+
+        <Button
+          onClick={handleGenerateAntibodyFeatureSet}
+          disabled={
+            isGeneratingAntibodyFeatures ||
+            !antibodyFeatureSetName.trim()
+          }
+        >
+          {isGeneratingAntibodyFeatures
+            ? "Generating Features..."
+            : "Generate Sequence Feature Set"}
+        </Button>
+
+        {antibodyFeaturesError && (
+          <p className="error-text">
+            {antibodyFeaturesError}
+          </p>
+        )}
+
+        {antibodyFeaturesResult && (
+          <div className="foundation-feature-result">
+            <strong>
+              {antibodyFeaturesResult.name}
+            </strong>
+
+            <span>
+              {antibodyFeaturesResult.num_rows} antibodies ·{" "}
+              {antibodyFeaturesResult.num_features} features
+            </span>
+          </div>
+        )}
+      </section>
+    )}
+
       {isAntibodyDataset && (
-        <section className="feature-builder-panel feature-panel-handcrafted">
-          {isAntibodyDataset ? (
-            <>
-              <div className="section-label">
-                Antibody Sequence Features
-              </div>
+        <section className="feature-builder-panel feature-panel-foundation">
+          <div className="section-label">
+            Foundation Model Features
+          </div>
 
-              <label className="feature-builder-field">
-                Feature set name
+          <label className="feature-builder-field">
+            Model
 
-                <input
-                  value={antibodyFeatureSetName}
-                  onChange={(event) =>
-                    setAntibodyFeatureSetName(event.target.value)
-                  }
-                  disabled={isGeneratingAntibodyFeatures}
-                  placeholder="Antibody Sequence Baseline"
-                />
-              </label>
+            <input
+              value="ESM-2 650M"
+              disabled
+            />
+          </label>
 
-              <p className="foundation-feature-description">
-                Generates interpretable sequence-derived features from
-                the heavy and light chains of each antibody sample.
-              </p>
+          <label className="feature-builder-field">
+            Feature set name
 
-              <Button
-                onClick={handleGenerateAntibodyFeatureSet}
-                disabled={
-                  isGeneratingAntibodyFeatures ||
-                  !antibodyFeatureSetName.trim()
-                }
-              >
-                {isGeneratingAntibodyFeatures
-                  ? "Generating Features..."
-                  : "Generate Sequence Feature Set"}
-              </Button>
+            <input
+              value={esmFeatureSetName}
+              onChange={(event) =>
+                setEsmFeatureSetName(event.target.value)
+              }
+              disabled={isGeneratingEsmFeatures}
+            />
+          </label>
 
-              {antibodyFeaturesError && (
-                <p className="error-text">
-                  {antibodyFeaturesError}
-                </p>
-              )}
+          <p className="foundation-feature-description">
+            Generates mean-pooled ESM-2 embeddings from the VH and VL
+            sequences and concatenates them into 2560 features per antibody.
+          </p>
 
-              {antibodyFeaturesResult && (
-                <div className="foundation-feature-result">
-                  <strong>{antibodyFeaturesResult.name}</strong>
-                  <span>
-                    {antibodyFeaturesResult.num_rows} antibodies ·{" "}
-                    {antibodyFeaturesResult.num_features} features
-                  </span>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {/* your ENTIRE existing handcrafted builder content */}
-            </>
+          <Button
+            onClick={handleGenerateEsmFeatureSet}
+            disabled={
+              isGeneratingEsmFeatures ||
+              !esmFeatureSetName.trim()
+            }
+          >
+            {isGeneratingEsmFeatures
+              ? "Generating Embeddings..."
+              : "Generate ESM Feature Set"}
+          </Button>
+
+          {esmFeaturesError && (
+            <p className="error-text">
+              {esmFeaturesError}
+            </p>
+          )}
+
+          {esmFeaturesResult && (
+            <div className="foundation-feature-result">
+              <strong>
+                {esmFeaturesResult.name}
+              </strong>
+
+              <span>
+                {esmFeaturesResult.num_rows} antibodies ·{" "}
+                {esmFeaturesResult.num_features} features
+              </span>
+            </div>
           )}
         </section>
       )}
@@ -1040,7 +1154,6 @@ function FeatureAnalysisTab({ activeDataset }) {
           </section>
         )}
 
-        {!isAntibodyDataset && (
           <section className="feature-builder-panel feature-panel-combine">
             <div className="section-label">
               Combine Feature Sets
@@ -1137,32 +1250,6 @@ function FeatureAnalysisTab({ activeDataset }) {
               </div>
             )}
           </section>
-        )}
-
-        {isAntibodyDataset && (
-          <section className="feature-builder-panel feature-panel-foundation">
-            <div className="section-label">
-              Foundation Model Features
-            </div>
-
-            <label className="feature-builder-field">
-              Model
-
-              <input
-                value="ESM"
-                disabled
-              />
-            </label>
-
-            <p className="foundation-feature-description">
-              Protein language model embeddings for antibody sequences.
-            </p>
-
-            <Button disabled>
-              Generate ESM Feature Set
-            </Button>
-          </section>
-        )}
 
         <section className="feature-builder-panel feature-panel-saved">
           <div className="section-label">Saved Feature Sets</div>

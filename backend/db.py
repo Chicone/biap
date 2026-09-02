@@ -92,6 +92,13 @@ def init_db():
           "r2 REAL",
         )
 
+        add_column_if_missing(
+          conn,
+          "ml_runs",
+          "pca_components",
+          "pca_components INTEGER DEFAULT 0",
+        )
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS image_channels (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

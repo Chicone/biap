@@ -24,6 +24,8 @@ from sklearn.model_selection import (
     cross_val_predict,
 )
 from db import get_connection
+from sklearn.decomposition import PCA
+from sklearn.compose import ColumnTransformer
 
 TARGET_FIELDS = {
     "moa": "MOA",
@@ -632,6 +634,10 @@ def save_ml_run(
     "classification",
   )
 
+  pca_components = int(
+    config.get("pca_components", 0)
+  )
+
   if task_type == "classification":
     report = result["classification_report"]
 
@@ -680,6 +686,7 @@ def save_ml_run(
         AND cv_strategy = ?
         AND cv_folds = ?
         AND random_seed = ?
+        AND pca_components = ?
       ORDER BY id DESC
       LIMIT 1
       """,
@@ -691,6 +698,7 @@ def save_ml_run(
         result["cross_validation"]["strategy"],
         result["cross_validation"]["folds"],
         config.get("random_seed", 42),
+        pca_components,
       ),
     ).fetchone()
 
@@ -708,6 +716,7 @@ def save_ml_run(
           cv_strategy,
           cv_folds,
           random_seed,
+          pca_components,
           num_samples,
           num_features,
           num_classes,
@@ -720,7 +729,7 @@ def save_ml_run(
           r2,
           result_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       """,
       (
         dataset_id,
@@ -730,6 +739,7 @@ def save_ml_run(
         result["cross_validation"]["strategy"],
         result["cross_validation"]["folds"],
         config.get("random_seed", 42),
+        pca_components,
         result["num_samples"],
         result["num_features"],
         num_classes,
@@ -763,6 +773,7 @@ def get_ml_runs(dataset_id: int):
           ml_runs.cv_strategy,
           ml_runs.cv_folds,
           ml_runs.random_seed,
+          ml_runs.pca_components,
 
           ml_runs.num_samples,
           ml_runs.num_features,
@@ -936,6 +947,11 @@ def _train_regression_model(
     "random_forest",
   )
 
+  pca_components = config.get(
+    "pca_components",
+    0,
+  )
+
   if model_name == "random_forest":
     model = RandomForestRegressor(
       n_estimators=200,
@@ -943,12 +959,71 @@ def _train_regression_model(
       n_jobs=-1,
     )
 
+
   elif model_name == "ridge":
-    model = make_pipeline(
-      StandardScaler(),
-      Ridge(),
+    if pca_components > 0:
+      model = make_pipeline(
+        StandardScaler(),
+        PCA(
+          n_components=pca_components,
+          random_state=random_seed,
+        ),
+        Ridge(),
+      )
+    else:
+      model = make_pipeline(
+        StandardScaler(),
+        Ridge(),
+      )
+  elif model_name == "ridge_esm_pca_fusion":
+    if pca_components <= 0:
+      raise ValueError(
+        "ESM PCA fusion requires PCA components > 0."
+      )
+
+    handcrafted_indices = [
+      index
+      for index, feature_name in enumerate(feature_names)
+      if feature_name.startswith("source1__")
+    ]
+
+    esm_indices = [
+      index
+      for index, feature_name in enumerate(feature_names)
+      if feature_name.startswith("source2__esm_")
+    ]
+
+    if not handcrafted_indices or not esm_indices:
+      raise ValueError(
+        "ESM PCA fusion requires the combined "
+        "handcrafted + ESM feature set."
+      )
+
+    preprocessor = ColumnTransformer(
+      transformers=[
+        (
+          "handcrafted",
+          StandardScaler(),
+          handcrafted_indices,
+        ),
+        (
+          "esm",
+          make_pipeline(
+            StandardScaler(),
+            PCA(
+              n_components=pca_components,
+              random_state=random_seed,
+            ),
+          ),
+          esm_indices,
+        ),
+      ]
     )
 
+    model = make_pipeline(
+      preprocessor,
+      Ridge(),
+    )
   else:
     raise ValueError(
       "Antibody regression currently supports "
@@ -1091,6 +1166,9 @@ def _train_regression_model(
   if model_name == "random_forest":
     importances = model.feature_importances_
 
+  elif model_name == "ridge_esm_pca_fusion":
+    importances = None
+
   else:
     regressor = model[-1]
 
@@ -1101,28 +1179,30 @@ def _train_regression_model(
           dtype=float,
         )
       )
-
     else:
       importances = np.zeros(
         len(feature_names),
         dtype=float,
       )
 
-  feature_importance = sorted(
-    [
-      {
-        "feature": feature_name,
-        "importance": float(importance),
-      }
-      for feature_name, importance
-      in zip(
+  if importances is None:
+    feature_importance = []
+  else:
+    feature_importance = sorted(
+      [
+        {
+          "feature": feature_name,
+          "importance": float(importance),
+        }
+        for feature_name, importance
+        in zip(
         feature_names,
         importances,
       )
-    ],
-    key=lambda item: item["importance"],
-    reverse=True,
-  )
+      ],
+      key=lambda item: item["importance"],
+      reverse=True,
+    )
 
   predictions = [
     {

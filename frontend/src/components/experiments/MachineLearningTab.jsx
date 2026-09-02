@@ -29,6 +29,7 @@ function MachineLearningTab({ activeDataset }) {
   );
   const isRegression =
     selectedTargetOption?.task_type === "regression";
+  const [pcaComponents, setPcaComponents] = useState(0);
 
   async function loadAvailableTargets() {
     if (!activeDataset) {
@@ -174,6 +175,7 @@ function MachineLearningTab({ activeDataset }) {
             cv_strategy: cvStrategy,
             cv_folds: cvFolds,
             random_seed: randomSeed,
+            pca_components: pcaComponents,
           }),
         }
       );
@@ -343,6 +345,12 @@ function MachineLearningTab({ activeDataset }) {
                 {isRegression ? "Ridge Regression" : "Ridge Classifier"}
               </option>
 
+              {isRegression && (
+                <option value="ridge_esm_pca_fusion">
+                  Ridge + ESM PCA Fusion
+                </option>
+              )}
+
               {!isRegression && (
                 <>
                   <option value="logistic_regression">
@@ -421,6 +429,23 @@ function MachineLearningTab({ activeDataset }) {
                 }
               />
             </label>
+
+            <label className="ml-field">
+              <span>PCA components</span>
+
+              <select
+                value={pcaComponents}
+                onChange={(event) =>
+                  setPcaComponents(Number(event.target.value))
+                }
+              >
+                <option value={0}>None</option>
+                <option value={32}>32</option>
+                <option value={48}>48</option>
+                <option value={64}>64</option>
+                <option value={128}>128</option>
+              </select>
+            </label>
           </div>
 
           {cvStrategy === "group_well" && (
@@ -486,6 +511,7 @@ function MachineLearningTab({ activeDataset }) {
                 <th>Target</th>
                 <th>Algorithm</th>
                 <th>CV</th>
+                <th>PCA</th>
                 <th>Primary Metric</th>
                 <th>Metric 2</th>
                 <th>Metric 3</th>
@@ -550,6 +576,12 @@ function MachineLearningTab({ activeDataset }) {
                     {run.cv_strategy}
                   </td>
 
+                  <td>
+                    {run.pca_components > 0
+                      ? `${run.pca_components} components`
+                      : "None"}
+                  </td>
+
                   {run.task_type === "regression" ? (
                     <>
                       <td>
@@ -572,45 +604,102 @@ function MachineLearningTab({ activeDataset }) {
                     </>
                   ) : (
                     <>
-                     {run.task_type === "regression" ? (
-                      <>
-                        <td>
-                          Spearman {run.spearman !== null
-                            ? run.spearman.toFixed(3)
-                            : "—"}
-                        </td>
+                        {run.task_type === "regression" ? (
+                        <>
+                          <td>
+                            Spearman{" "}
+                            {run.spearman !== null
+                              ? run.spearman.toFixed(3)
+                              : "—"}
+                          </td>
 
-                        <td>
-                          MAE {run.mae !== null
-                            ? run.mae.toFixed(3)
-                            : "—"}
-                        </td>
+                          <td>
+                            MAE{" "}
+                            {run.mae !== null
+                              ? run.mae.toFixed(3)
+                              : "—"}
+                          </td>
 
-                        <td>
-                          R² {run.r2 !== null
-                            ? run.r2.toFixed(3)
-                            : "—"}
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td>
-                          {(run.accuracy * 100).toFixed(1)}%
-                        </td>
+                          <td>
+                            R²{" "}
+                            {run.r2 !== null
+                              ? run.r2.toFixed(3)
+                              : "—"}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          {run.task_type === "regression" ? (
+                            <>
+                              <td>
+                                Spearman{" "}
+                                {run.spearman !== null
+                                  ? run.spearman.toFixed(3)
+                                  : "—"}
+                              </td>
 
-                        <td>
-                          {run.macro_f1 !== null
-                            ? run.macro_f1.toFixed(3)
-                            : "—"}
-                        </td>
+                              <td>
+                                MAE{" "}
+                                {run.mae !== null
+                                  ? run.mae.toFixed(3)
+                                  : "—"}
+                              </td>
 
-                        <td>
-                          {run.weighted_f1 !== null
-                            ? run.weighted_f1.toFixed(3)
-                            : "—"}
-                        </td>
-                      </>
-                    )}
+                              <td>
+                                R²{" "}
+                                {run.r2 !== null
+                                  ? run.r2.toFixed(3)
+                                  : "—"}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              {run.task_type === "regression" ? (
+                                <>
+                                  <td>
+                                    Spearman{" "}
+                                    {run.spearman !== null
+                                      ? run.spearman.toFixed(3)
+                                      : "—"}
+                                  </td>
+
+                                  <td>
+                                    MAE{" "}
+                                    {run.mae !== null
+                                      ? run.mae.toFixed(3)
+                                      : "—"}
+                                  </td>
+
+                                  <td>
+                                    R²{" "}
+                                    {run.r2 !== null
+                                      ? run.r2.toFixed(3)
+                                      : "—"}
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td>
+                                    {(run.accuracy * 100).toFixed(1)}%
+                                  </td>
+
+                                  <td>
+                                    {run.macro_f1 !== null
+                                      ? run.macro_f1.toFixed(3)
+                                      : "—"}
+                                  </td>
+
+                                  <td>
+                                    {run.weighted_f1 !== null
+                                      ? run.weighted_f1.toFixed(3)
+                                      : "—"}
+                                  </td>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )}
                     </>
                   )}
 
@@ -678,6 +767,7 @@ function MachineLearningTab({ activeDataset }) {
                 <th>Target</th>
                 <th>Algorithm</th>
                 <th>CV</th>
+                <th>PCA</th>
                 <th>Samples</th>
                 <th>Features</th>
                 <th>Primary Metric</th>
@@ -713,6 +803,12 @@ function MachineLearningTab({ activeDataset }) {
                     </td>
 
                     <td>
+                      {run.pca_components > 0
+                        ? `${run.pca_components} components`
+                        : "None"}
+                    </td>
+
+                    <td>
                       {run.num_samples}
                     </td>
 
@@ -720,21 +816,48 @@ function MachineLearningTab({ activeDataset }) {
                       {run.num_features}
                     </td>
 
-                    <td>
-                      {(run.accuracy * 100).toFixed(1)}%
-                    </td>
+                                        {run.task_type === "regression" ? (
+                      <>
+                        <td>
+                          Spearman{" "}
+                          {run.spearman !== null
+                            ? run.spearman.toFixed(3)
+                            : "—"}
+                        </td>
 
-                    <td>
-                      {run.macro_f1 !== null
-                        ? run.macro_f1.toFixed(3)
-                        : "—"}
-                    </td>
+                        <td>
+                          MAE{" "}
+                          {run.mae !== null
+                            ? run.mae.toFixed(3)
+                            : "—"}
+                        </td>
 
-                    <td>
-                      {run.weighted_f1 !== null
-                        ? run.weighted_f1.toFixed(3)
-                        : "—"}
-                    </td>
+                        <td>
+                          R²{" "}
+                          {run.r2 !== null
+                            ? run.r2.toFixed(3)
+                            : "—"}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>
+                          {(run.accuracy * 100).toFixed(1)}%
+                        </td>
+
+                        <td>
+                          {run.macro_f1 !== null
+                            ? run.macro_f1.toFixed(3)
+                            : "—"}
+                        </td>
+
+                        <td>
+                          {run.weighted_f1 !== null
+                            ? run.weighted_f1.toFixed(3)
+                            : "—"}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
             </tbody>

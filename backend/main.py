@@ -43,6 +43,8 @@ from ml.trainer import (
 )
 from vision.foundation_models.dinov2 import get_dinov2_model
 
+from embeddings.esm import ESMEmbedder
+
 app = FastAPI()
 init_db()
 
@@ -124,6 +126,7 @@ class MachineLearningTrainRequest(BaseModel):
   cv_strategy: str = "stratified"
   cv_folds: int
   random_seed: int
+  pca_components: int = 0
 
 
 class FeatureSetCreateRequest(BaseModel):
@@ -1921,6 +1924,27 @@ def combine_feature_sets(
         )
 
     with get_connection() as conn:
+        dataset_row = conn.execute(
+            """
+            SELECT dataset_type
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+        if dataset_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Dataset not found.",
+            )
+
+        dataset_type = (
+            dataset_row["dataset_type"]
+            .strip()
+            .lower()
+        )
+
         existing = conn.execute(
             """
             SELECT id
@@ -1934,37 +1958,97 @@ def combine_feature_sets(
             ),
         ).fetchone()
 
-    if existing is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f'A feature set named "{combined_name}" '
-                "already exists."
-            ),
-        )
+        if existing is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f'A feature set named "{combined_name}" '
+                    "already exists."
+                ),
+            )
 
-    source_sets = [
-        _load_feature_set_as_image_rows(
-            dataset_id=dataset_id,
-            feature_set_id=feature_set_id,
-        )
-        for feature_set_id in request.feature_set_ids
-    ]
+        source_sets = []
 
-    common_image_ids = set(
+        for feature_set_id in request.feature_set_ids:
+            feature_set_row = conn.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    feature_names_json
+                FROM feature_sets
+                WHERE id = ?
+                AND dataset_id = ?
+                """,
+                (
+                    feature_set_id,
+                    dataset_id,
+                ),
+            ).fetchone()
+
+            if feature_set_row is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Feature set {feature_set_id} "
+                        "was not found."
+                    ),
+                )
+
+            if dataset_type == "antibody":
+                rows = conn.execute(
+                    """
+                    SELECT
+                        antibody_sample_id AS sample_id,
+                        features_json
+                    FROM antibody_feature_set_rows
+                    WHERE feature_set_id = ?
+                    ORDER BY antibody_sample_id
+                    """,
+                    (feature_set_id,),
+                ).fetchall()
+
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT
+                        image_id AS sample_id,
+                        features_json
+                    FROM feature_set_rows
+                    WHERE feature_set_id = ?
+                    AND object_label IS NULL
+                    ORDER BY image_id
+                    """,
+                    (feature_set_id,),
+                ).fetchall()
+
+            source_sets.append(
+                {
+                    "id": feature_set_id,
+                    "name": feature_set_row["name"],
+                    "rows": {
+                        int(row["sample_id"]): json.loads(
+                            row["features_json"]
+                        )
+                        for row in rows
+                    },
+                }
+            )
+
+    common_sample_ids = set(
         source_sets[0]["rows"].keys()
     )
 
     for source_set in source_sets[1:]:
-        common_image_ids &= set(
+        common_sample_ids &= set(
             source_set["rows"].keys()
         )
 
-    if not common_image_ids:
+    if not common_sample_ids:
         raise HTTPException(
             status_code=400,
             detail=(
-                "The selected Feature Sets have no images in common."
+                "The selected Feature Sets have no samples in common."
             ),
         )
 
@@ -1975,12 +2059,14 @@ def combine_feature_sets(
         source_sets,
         start=1,
     ):
-        example_image_id = next(
-            iter(common_image_ids)
+        example_sample_id = next(
+            iter(common_sample_ids)
         )
 
         source_feature_names = sorted(
-            source_set["rows"][example_image_id].keys()
+            source_set["rows"][
+                example_sample_id
+            ].keys()
         )
 
         for feature_name in source_feature_names:
@@ -1988,7 +2074,7 @@ def combine_feature_sets(
                 f"source{source_index}__{feature_name}"
             )
 
-    for image_id in sorted(common_image_ids):
+    for sample_id in sorted(common_sample_ids):
         combined_features = {}
 
         for source_index, source_set in enumerate(
@@ -1996,24 +2082,30 @@ def combine_feature_sets(
             start=1,
         ):
             source_features = source_set["rows"][
-                image_id
+                sample_id
             ]
 
-            for feature_name, value in source_features.items():
+            for feature_name, value in (
+                source_features.items()
+            ):
                 combined_features[
                     f"source{source_index}__{feature_name}"
                 ] = float(value)
 
         combined_rows.append(
             (
-                image_id,
+                sample_id,
                 combined_features,
             )
         )
 
     configuration = {
         "extractor": "combined",
-        "aggregation_level": "image",
+        "aggregation_level": (
+            "antibody"
+            if dataset_type == "antibody"
+            else "image"
+        ),
         "source_feature_set_ids": request.feature_set_ids,
         "source_feature_set_names": [
             source_set["name"]
@@ -2042,7 +2134,9 @@ def combine_feature_sets(
                     configuration,
                     sort_keys=True,
                 ),
-                json.dumps(combined_feature_names),
+                json.dumps(
+                    combined_feature_names
+                ),
                 len(combined_rows),
                 len(combined_feature_names),
             ),
@@ -2050,31 +2144,57 @@ def combine_feature_sets(
 
         feature_set_id = cursor.lastrowid
 
-        conn.executemany(
-            """
-            INSERT INTO feature_set_rows
-            (
-                feature_set_id,
-                image_id,
-                object_label,
-                features_json
+        if dataset_type == "antibody":
+            conn.executemany(
+                """
+                INSERT INTO antibody_feature_set_rows
+                (
+                    feature_set_id,
+                    antibody_sample_id,
+                    features_json
+                )
+                VALUES (?, ?, ?)
+                """,
+                [
+                    (
+                        feature_set_id,
+                        sample_id,
+                        json.dumps(
+                            features,
+                            sort_keys=True,
+                        ),
+                    )
+                    for sample_id, features
+                    in combined_rows
+                ],
             )
-            VALUES (?, ?, ?, ?)
-            """,
-            [
+
+        else:
+            conn.executemany(
+                """
+                INSERT INTO feature_set_rows
                 (
                     feature_set_id,
                     image_id,
-                    None,
-                    json.dumps(
-                        features,
-                        sort_keys=True,
-                    ),
+                    object_label,
+                    features_json
                 )
-                for image_id, features
-                in combined_rows
-            ],
-        )
+                VALUES (?, ?, ?, ?)
+                """,
+                [
+                    (
+                        feature_set_id,
+                        sample_id,
+                        None,
+                        json.dumps(
+                            features,
+                            sort_keys=True,
+                        ),
+                    )
+                    for sample_id, features
+                    in combined_rows
+                ],
+            )
 
     return {
         "feature_set_id": feature_set_id,
@@ -2714,3 +2834,174 @@ def create_antibody_sequence_feature_set(
         "persisted": True,
         "status": "ready",
     }
+
+@app.post("/datasets/{dataset_id}/feature-sets/antibody-esm")
+def create_antibody_esm_feature_set(
+  dataset_id: int,
+  request: AntibodyFeatureSetCreateRequest,
+):
+  feature_set_name = request.name.strip()
+
+  if not feature_set_name:
+    raise HTTPException(
+      status_code=400,
+      detail="Feature set name is required.",
+    )
+
+  with get_connection() as conn:
+    dataset_row = conn.execute(
+      """
+      SELECT dataset_type
+      FROM datasets
+      WHERE id = ?
+      """,
+      (dataset_id,),
+    ).fetchone()
+
+    if dataset_row is None:
+      raise HTTPException(
+        status_code=404,
+        detail="Dataset not found.",
+      )
+
+    if dataset_row["dataset_type"].strip().lower() != "antibody":
+      raise HTTPException(
+        status_code=400,
+        detail="This dataset is not an antibody dataset.",
+      )
+
+    existing = conn.execute(
+      """
+      SELECT id
+      FROM feature_sets
+      WHERE dataset_id = ?
+      AND LOWER(name) = LOWER(?)
+      """,
+      (
+        dataset_id,
+        feature_set_name,
+      ),
+    ).fetchone()
+
+    if existing is not None:
+      raise HTTPException(
+        status_code=409,
+        detail=(
+          f'A feature set named "{feature_set_name}" '
+          "already exists."
+        ),
+      )
+
+    antibody_rows = conn.execute(
+      """
+      SELECT
+        id,
+        heavy_chain_sequence,
+        light_chain_sequence
+      FROM antibody_samples
+      WHERE dataset_id = ?
+      ORDER BY id
+      """,
+      (dataset_id,),
+    ).fetchall()
+
+  if not antibody_rows:
+    raise HTTPException(
+      status_code=400,
+      detail="The dataset contains no antibody samples.",
+    )
+
+  embedder = ESMEmbedder()
+
+  generated_rows = []
+
+  for row in antibody_rows:
+    antibody = dict(row)
+
+    embedding = embedder.embed_antibody(
+      antibody["heavy_chain_sequence"],
+      antibody["light_chain_sequence"],
+    )
+
+    features = {
+      f"esm_{index:04d}": float(value)
+      for index, value in enumerate(embedding)
+    }
+
+    generated_rows.append(
+      (
+        antibody["id"],
+        features,
+      )
+    )
+
+  feature_names = [
+    f"esm_{index:04d}"
+    for index in range(2560)
+  ]
+
+  configuration = {
+    "representation": "esm2",
+    "model": "facebook/esm2_t33_650M_UR50D",
+    "pooling": "mean",
+    "chains": "VH+VL",
+    "embedding_dimension": 2560,
+  }
+
+  with get_connection() as conn:
+    cursor = conn.execute(
+      """
+      INSERT INTO feature_sets
+      (
+        dataset_id,
+        name,
+        configuration_json,
+        feature_names_json,
+        num_rows,
+        num_features
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      """,
+      (
+        dataset_id,
+        feature_set_name,
+        json.dumps(configuration, sort_keys=True),
+        json.dumps(feature_names),
+        len(generated_rows),
+        len(feature_names),
+      ),
+    )
+
+    feature_set_id = cursor.lastrowid
+
+    conn.executemany(
+      """
+      INSERT INTO antibody_feature_set_rows
+      (
+        feature_set_id,
+        antibody_sample_id,
+        features_json
+      )
+      VALUES (?, ?, ?)
+      """,
+      [
+        (
+          feature_set_id,
+          antibody_sample_id,
+          json.dumps(features),
+        )
+        for antibody_sample_id, features
+        in generated_rows
+      ],
+    )
+
+  return {
+    "feature_set_id": feature_set_id,
+    "dataset_id": dataset_id,
+    "name": feature_set_name,
+    "configuration": configuration,
+    "num_rows": len(generated_rows),
+    "num_features": len(feature_names),
+    "persisted": True,
+    "status": "ready",
+  }
