@@ -115,7 +115,7 @@ class JUMPImportRequest(BaseModel):
   folder_path: str
 
 class AntibodyImportRequest(BaseModel):
-  csv_path: str
+  dataset_path: str
 
 class MachineLearningTrainRequest(BaseModel):
   feature_set_id: int
@@ -830,18 +830,18 @@ async def import_antibodies(
         status_code=400,
         detail="This dataset is not an antibody dataset.",
       )
-    csv_path = Path(
-        request.csv_path
+    dataset_path = Path(
+      request.dataset_path
     )
 
-    if not csv_path.exists():
+    if not dataset_path.exists():
         raise HTTPException(
             status_code=404,
             detail="Antibody CSV file not found",
         )
 
     importer = AntibodyImporter(
-        csv_path
+        dataset_path
     )
 
     try:

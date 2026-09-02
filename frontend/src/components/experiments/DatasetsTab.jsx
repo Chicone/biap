@@ -60,7 +60,7 @@ function DatasetsTab({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            csv_path: antibodyCsvPath.trim(),
+            dataset_path: antibodyCsvPath.trim(),
           }),
         }
       );
@@ -100,7 +100,7 @@ function DatasetsTab({
           <TableRow>
             <TableHead className="pl-4">Name</TableHead>
             <TableHead>Type</TableHead>
-            <TableHead>Images</TableHead>
+            <TableHead>Samples</TableHead>
             <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>

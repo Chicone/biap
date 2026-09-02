@@ -64,6 +64,34 @@ def init_db():
             )
         """)
 
+        add_column_if_missing(
+          conn,
+          "ml_runs",
+          "task_type",
+          "task_type TEXT DEFAULT 'classification'",
+        )
+
+        add_column_if_missing(
+          conn,
+          "ml_runs",
+          "spearman",
+          "spearman REAL",
+        )
+
+        add_column_if_missing(
+          conn,
+          "ml_runs",
+          "mae",
+          "mae REAL",
+        )
+
+        add_column_if_missing(
+          conn,
+          "ml_runs",
+          "r2",
+          "r2 REAL",
+        )
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS image_channels (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

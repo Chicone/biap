@@ -6,7 +6,17 @@ from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from sklearn.svm import LinearSVC
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
+from sklearn.linear_model import Ridge
+from sklearn.model_selection import KFold
+from sklearn.metrics import (
+    mean_absolute_error,
+    r2_score,
+)
+from scipy.stats import spearmanr
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import (
     StratifiedGroupKFold,
@@ -25,11 +35,87 @@ TARGET_FIELDS = {
 
 def get_available_targets(dataset_id: int):
   """
-  Return supervised-learning targets that actually contain
-  useful values in the active dataset.
+  Return supervised-learning targets available for the active dataset.
+
+  Image datasets:
+      categorical targets from the images table.
+
+  Antibody datasets:
+      numeric regression targets discovered dynamically from targets_json.
   """
 
   with get_connection() as conn:
+    dataset_row = conn.execute(
+      """
+      SELECT dataset_type
+      FROM datasets
+      WHERE id = ?
+      """,
+      (dataset_id,),
+    ).fetchone()
+
+    if dataset_row is None:
+      raise ValueError(
+        f"Dataset {dataset_id} was not found."
+      )
+
+    dataset_type = (
+      dataset_row["dataset_type"]
+      .strip()
+      .lower()
+    )
+
+    if dataset_type == "antibody":
+      rows = conn.execute(
+        """
+        SELECT targets_json
+        FROM antibody_samples
+        WHERE dataset_id = ?
+        """,
+        (dataset_id,),
+      ).fetchall()
+
+      values_by_target = {}
+
+      for row in rows:
+        targets_json = row["targets_json"]
+
+        if not targets_json:
+          continue
+
+        targets = json.loads(targets_json)
+
+        for target_name, value in targets.items():
+          if not isinstance(value, (int, float)):
+            continue
+
+          if not np.isfinite(float(value)):
+            continue
+
+          values_by_target.setdefault(
+            target_name,
+            [],
+          ).append(float(value))
+
+      available_targets = []
+
+      for target_name in sorted(values_by_target):
+        values = values_by_target[target_name]
+
+        if len(values) < 2:
+          continue
+
+        available_targets.append(
+          {
+            "value": target_name,
+            "label": target_name,
+            "task_type": "regression",
+            "num_samples": len(values),
+          }
+        )
+
+      return available_targets
+
     rows = conn.execute(
       """
       SELECT
@@ -53,13 +139,12 @@ def get_available_targets(dataset_id: int):
          and row[field_name] != ""
     }
 
-    # A supervised classification target only makes sense
-    # when at least two distinct classes/values exist.
     if len(values) >= 2:
       available_targets.append(
         {
           "value": field_name,
           "label": label,
+          "task_type": "classification",
           "num_classes": len(values),
         }
       )
@@ -67,7 +152,7 @@ def get_available_targets(dataset_id: int):
   return available_targets
 
 
-def _load_feature_set_dataset(
+def _load_image_feature_set_dataset(
     dataset_id: int,
     feature_set_id: int,
     target_name: str,
@@ -314,23 +399,274 @@ def _load_feature_set_dataset(
     feature_set_record,
   )
 
+def _load_antibody_feature_set_dataset(
+  dataset_id: int,
+  feature_set_id: int,
+  target_name: str,
+  competition_mode: bool = False,
+):
+  with get_connection() as conn:
+    feature_set_row = conn.execute(
+      """
+      SELECT
+          id,
+          dataset_id,
+          name,
+          feature_names_json,
+          configuration_json
+      FROM feature_sets
+      WHERE id = ?
+      """,
+      (feature_set_id,),
+    ).fetchone()
+
+    if feature_set_row is None:
+      raise ValueError(
+        f"Feature set {feature_set_id} was not found."
+      )
+
+    feature_set_record = dict(feature_set_row)
+
+    if feature_set_record["dataset_id"] != dataset_id:
+      raise ValueError(
+        "The selected Feature Set does not belong to "
+        "the active dataset."
+      )
+
+    stored_rows = conn.execute(
+      """
+      SELECT
+          antibody_feature_set_rows.antibody_sample_id,
+          antibody_feature_set_rows.features_json,
+          antibody_samples.sample_name,
+          antibody_samples.metadata_json,
+          antibody_samples.targets_json
+      FROM antibody_feature_set_rows
+      JOIN antibody_samples
+        ON antibody_samples.id =
+           antibody_feature_set_rows.antibody_sample_id
+      WHERE antibody_feature_set_rows.feature_set_id = ?
+      ORDER BY antibody_feature_set_rows.antibody_sample_id
+      """,
+      (feature_set_id,),
+    ).fetchall()
+
+  if not stored_rows:
+    raise ValueError(
+      "The selected antibody Feature Set contains no stored rows."
+    )
+
+  stored_feature_names = json.loads(
+    feature_set_record["feature_names_json"]
+  )
+
+  if not stored_feature_names:
+    raise ValueError(
+      "The selected Feature Set contains no features."
+    )
+
+  feature_rows = []
+  targets = []
+  sample_ids = []
+  competition_folds = []
+
+  for row in stored_rows:
+    record = dict(row)
+
+    if competition_mode:
+      metadata = json.loads(
+        record.get("metadata_json") or "{}"
+      )
+
+      competition_targets = metadata.get(
+        "competition_targets",
+        [],
+      )
+
+      if target_name not in competition_targets:
+        continue
+
+    targets_json = record.get("targets_json")
+
+    if not targets_json:
+      continue
+
+    sample_targets = json.loads(targets_json)
+
+    target_value = sample_targets.get(target_name)
+
+    if not isinstance(target_value, (int, float)):
+      continue
+
+    target_value = float(target_value)
+
+    if not np.isfinite(target_value):
+      continue
+
+    features = json.loads(
+      record["features_json"]
+    )
+
+    numeric_features = {}
+
+    for feature_name in stored_feature_names:
+      value = features.get(feature_name)
+
+      if not isinstance(value, (int, float)):
+        raise ValueError(
+          f'Feature "{feature_name}" is missing or '
+          f'non-numeric for antibody sample '
+          f'{record["antibody_sample_id"]}.'
+        )
+
+      numeric_value = float(value)
+
+      if not np.isfinite(numeric_value):
+        raise ValueError(
+          f'Feature "{feature_name}" contains a '
+          f'non-finite value for antibody sample '
+          f'{record["antibody_sample_id"]}.'
+        )
+
+      numeric_features[feature_name] = numeric_value
+
+    feature_rows.append(numeric_features)
+    targets.append(target_value)
+    sample_ids.append(
+      int(record["antibody_sample_id"])
+    )
+
+    metadata_json = record.get("metadata_json")
+    metadata = json.loads(metadata_json or "{}")
+
+    competition_folds.append(
+      metadata.get("competition_fold")
+    )
+
+  if not feature_rows:
+    raise ValueError(
+      f'No antibody samples contain a valid "{target_name}" '
+      "target and Feature Set row."
+    )
+
+  matrix = np.array(
+    [
+      [
+        feature_row[feature_name]
+        for feature_name in stored_feature_names
+      ]
+      for feature_row in feature_rows
+    ],
+    dtype=float,
+  )
+
+  return (
+    matrix,
+    np.array(targets, dtype=float),
+    stored_feature_names,
+    sample_ids,
+    np.array(
+      [None] * len(sample_ids),
+      dtype=object,
+    ),
+    np.array(
+      [None] * len(sample_ids),
+      dtype=object,
+    ),
+    np.array(
+      competition_folds,
+      dtype=object,
+    ),
+    feature_set_record,
+  )
+
+def _load_feature_set_dataset(
+  dataset_id: int,
+  feature_set_id: int,
+  target_name: str,
+  competition_mode: bool = False,
+):
+  with get_connection() as conn:
+    dataset_row = conn.execute(
+      """
+      SELECT dataset_type
+      FROM datasets
+      WHERE id = ?
+      """,
+      (dataset_id,),
+    ).fetchone()
+
+  if dataset_row is None:
+    raise ValueError(
+      f"Dataset {dataset_id} was not found."
+    )
+
+  dataset_type = (
+    dataset_row["dataset_type"]
+    .strip()
+    .lower()
+  )
+
+  if dataset_type == "antibody":
+    return _load_antibody_feature_set_dataset(
+      dataset_id=dataset_id,
+      feature_set_id=feature_set_id,
+      target_name=target_name,
+      competition_mode=competition_mode,
+    )
+
+  return _load_image_feature_set_dataset(
+    dataset_id=dataset_id,
+    feature_set_id=feature_set_id,
+    target_name=target_name,
+  )
+
 def save_ml_run(
   dataset_id: int,
   feature_set_id: int,
   config: dict,
   result: dict,
 ):
-  report = result["classification_report"]
+  task_type = result.get(
+    "task_type",
+    "classification",
+  )
 
-  macro_f1 = report.get(
-    "macro avg",
-    {},
-  ).get("f1-score")
+  if task_type == "classification":
+    report = result["classification_report"]
 
-  weighted_f1 = report.get(
-    "weighted avg",
-    {},
-  ).get("f1-score")
+    macro_f1 = report.get(
+      "macro avg",
+      {},
+    ).get("f1-score")
+
+    weighted_f1 = report.get(
+      "weighted avg",
+      {},
+    ).get("f1-score")
+
+    num_classes = result["num_classes"]
+    accuracy = result["accuracy"]
+
+    spearman = None
+    mae = None
+    r2 = None
+
+  elif task_type == "regression":
+    macro_f1 = None
+    weighted_f1 = None
+
+    num_classes = 0
+    accuracy = 0.0
+
+    spearman = result.get("spearman")
+    mae = result.get("mae")
+    r2 = result.get("r2")
+
+  else:
+    raise ValueError(
+      f"Unsupported task type: {task_type}"
+    )
 
   with get_connection() as conn:
     existing_run = conn.execute(
@@ -352,7 +688,7 @@ def save_ml_run(
         feature_set_id,
         config.get("target", "moa"),
         config.get("algorithm", "random_forest"),
-        config.get("cv_strategy", "stratified"),
+        result["cross_validation"]["strategy"],
         result["cross_validation"]["folds"],
         config.get("random_seed", 42),
       ),
@@ -360,6 +696,7 @@ def save_ml_run(
 
     if existing_run is not None:
       return existing_run["id"]
+
     cursor = conn.execute(
       """
       INSERT INTO ml_runs
@@ -377,24 +714,32 @@ def save_ml_run(
           accuracy,
           macro_f1,
           weighted_f1,
+          task_type,
+          spearman,
+          mae,
+          r2,
           result_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       """,
       (
         dataset_id,
         feature_set_id,
         config.get("target", "moa"),
         config.get("algorithm", "random_forest"),
-        config.get("cv_strategy", "stratified"),
+        result["cross_validation"]["strategy"],
         result["cross_validation"]["folds"],
         config.get("random_seed", 42),
         result["num_samples"],
         result["num_features"],
-        result["num_classes"],
-        result["accuracy"],
+        num_classes,
+        accuracy,
         macro_f1,
         weighted_f1,
+        task_type,
+        spearman,
+        mae,
+        r2,
         json.dumps(result),
       ),
     )
@@ -426,7 +771,12 @@ def get_ml_runs(dataset_id: int):
           ml_runs.accuracy,
           ml_runs.macro_f1,
           ml_runs.weighted_f1,
-
+          
+          ml_runs.task_type,
+          ml_runs.spearman,
+          ml_runs.mae,
+          ml_runs.r2,
+          
           ml_runs.created_at
 
       FROM ml_runs
@@ -481,7 +831,355 @@ def delete_ml_run(
     "run_id": run_id,
   }
 
-def train_model(dataset_id: int, config: dict):
+def train_model(
+  dataset_id: int,
+  config: dict,
+):
+  with get_connection() as conn:
+    dataset_row = conn.execute(
+      """
+      SELECT dataset_type
+      FROM datasets
+      WHERE id = ?
+      """,
+      (dataset_id,),
+    ).fetchone()
+
+  if dataset_row is None:
+    raise ValueError(
+      f"Dataset {dataset_id} was not found."
+    )
+
+  dataset_type = (
+    dataset_row["dataset_type"]
+    .strip()
+    .lower()
+  )
+
+  if dataset_type == "antibody":
+    return _train_regression_model(
+      dataset_id=dataset_id,
+      config=config,
+    )
+
+  return _train_classification_model(
+    dataset_id=dataset_id,
+    config=config,
+  )
+
+
+def _train_regression_model(
+  dataset_id: int,
+  config: dict,
+):
+  feature_set_id = config.get("feature_set_id")
+
+  if feature_set_id is None:
+    raise ValueError(
+      "A persisted Feature Set must be selected."
+    )
+
+  target_name = config.get("target")
+
+  if not target_name:
+    raise ValueError(
+      "A regression target must be selected."
+    )
+
+  (
+    X,
+    y,
+    feature_names,
+    sample_ids,
+    _groups,
+    _compound_groups,
+    competition_folds,
+    feature_set_record,
+  ) = _load_feature_set_dataset(
+    dataset_id=dataset_id,
+    feature_set_id=int(feature_set_id),
+    target_name=target_name,
+    competition_mode=(
+      config.get("cv_strategy") == "competition_fold"
+    ),
+  )
+
+  if len(y) < 3:
+    raise ValueError(
+      "Regression evaluation requires at least "
+      "three samples."
+    )
+
+  random_seed = config.get(
+    "random_seed",
+    42,
+  )
+
+  requested_cv_folds = config.get(
+    "cv_folds",
+    5,
+  )
+
+  usable_cv_folds = min(
+    requested_cv_folds,
+    len(y),
+  )
+
+  if usable_cv_folds < 2:
+    raise ValueError(
+      "Regression cross-validation requires "
+      "at least two folds."
+    )
+
+  model_name = config.get(
+    "algorithm",
+    "random_forest",
+  )
+
+  if model_name == "random_forest":
+    model = RandomForestRegressor(
+      n_estimators=200,
+      random_state=random_seed,
+      n_jobs=-1,
+    )
+
+  elif model_name == "ridge":
+    model = make_pipeline(
+      StandardScaler(),
+      Ridge(),
+    )
+
+  else:
+    raise ValueError(
+      "Antibody regression currently supports "
+      "Random Forest and Ridge."
+    )
+
+  cv_strategy = config.get(
+    "cv_strategy",
+    "kfold",
+  )
+
+  fold_spearman = None
+
+  if cv_strategy == "competition_fold":
+    if any(
+      fold is None
+      for fold in competition_folds
+    ):
+      raise ValueError(
+        "Competition-fold evaluation requires "
+        "a fold assignment for every antibody."
+      )
+
+    unique_folds = sorted(
+      set(
+        int(fold)
+        for fold in competition_folds
+      )
+    )
+
+    y_pred = np.empty(
+      len(y),
+      dtype=float,
+    )
+
+    fold_spearman = []
+
+    for fold in unique_folds:
+      train_indices = np.array(
+        [
+          index
+          for index, sample_fold
+          in enumerate(competition_folds)
+          if int(sample_fold) != fold
+        ]
+      )
+
+      test_indices = np.array(
+        [
+          index
+          for index, sample_fold
+          in enumerate(competition_folds)
+          if int(sample_fold) == fold
+        ]
+      )
+
+      model.fit(
+        X[train_indices],
+        y[train_indices],
+      )
+
+      fold_predictions = model.predict(
+        X[test_indices]
+      )
+
+      y_pred[test_indices] = fold_predictions
+
+      fold_result = spearmanr(
+        y[test_indices],
+        fold_predictions,
+      )
+
+      fold_spearman.append(
+        float(fold_result.statistic)
+      )
+
+    spearman = float(
+      np.mean(fold_spearman)
+    )
+
+    usable_cv_folds = len(unique_folds)
+
+    evaluation_name = (
+      "GDPa1 competition 5-fold"
+    )
+
+  elif cv_strategy == "kfold":
+    cv = KFold(
+      n_splits=usable_cv_folds,
+      shuffle=True,
+      random_state=random_seed,
+    )
+
+    y_pred = cross_val_predict(
+      model,
+      X,
+      y,
+      cv=cv,
+      n_jobs=-1,
+    )
+
+    spearman_result = spearmanr(
+      y,
+      y_pred,
+    )
+
+    spearman = float(
+      spearman_result.statistic
+    )
+
+    evaluation_name = (
+      f"{usable_cv_folds}-fold "
+      "K-fold cross-validation"
+    )
+
+  else:
+    raise ValueError(
+      f"Unsupported regression CV strategy: {cv_strategy}"
+    )
+
+  mae = float(
+    mean_absolute_error(
+      y,
+      y_pred,
+    )
+  )
+
+  r2 = float(
+    r2_score(
+      y,
+      y_pred,
+    )
+  )
+
+  model.fit(
+    X,
+    y,
+  )
+
+  if model_name == "random_forest":
+    importances = model.feature_importances_
+
+  else:
+    regressor = model[-1]
+
+    if hasattr(regressor, "coef_"):
+      importances = np.abs(
+        np.asarray(
+          regressor.coef_,
+          dtype=float,
+        )
+      )
+
+    else:
+      importances = np.zeros(
+        len(feature_names),
+        dtype=float,
+      )
+
+  feature_importance = sorted(
+    [
+      {
+        "feature": feature_name,
+        "importance": float(importance),
+      }
+      for feature_name, importance
+      in zip(
+        feature_names,
+        importances,
+      )
+    ],
+    key=lambda item: item["importance"],
+    reverse=True,
+  )
+
+  predictions = [
+    {
+      "sample_id": int(sample_id),
+      "actual": float(actual),
+      "predicted": float(predicted),
+      "residual": float(
+        actual - predicted
+      ),
+    }
+    for sample_id, actual, predicted
+    in zip(
+      sample_ids,
+      y,
+      y_pred,
+    )
+  ]
+
+  result = {
+    "dataset_id": dataset_id,
+    "feature_set_id": int(feature_set_id),
+    "feature_set_name": feature_set_record["name"],
+    "status": "evaluated",
+    "task_type": "regression",
+    "algorithm": model_name,
+    "target": target_name,
+    "num_samples": int(X.shape[0]),
+    "num_features": int(X.shape[1]),
+    "spearman": spearman,
+    "mae": mae,
+    "r2": r2,
+    "fold_spearman": fold_spearman,
+    "cross_validation": {
+      "strategy": cv_strategy,
+      "name": evaluation_name,
+      "folds": int(usable_cv_folds),
+    },
+    "predictions": predictions,
+    "top_features": feature_importance[:20],
+    "sample_ids": sample_ids,
+  }
+
+  run_id = save_ml_run(
+    dataset_id=dataset_id,
+    feature_set_id=int(feature_set_id),
+    config=config,
+    result=result,
+  )
+
+  result["run_id"] = run_id
+
+  return result
+
+def _train_classification_model(
+    dataset_id: int,
+    config: dict,
+  ):
   algorithm = config.get(
     "algorithm",
     "random_forest",

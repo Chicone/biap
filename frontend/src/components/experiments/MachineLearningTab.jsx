@@ -24,6 +24,11 @@ function MachineLearningTab({ activeDataset }) {
   const [savedRunsError, setSavedRunsError] = useState(null);
   const [selectedRunIds, setSelectedRunIds] = useState([]);
   const [runFilter, setRunFilter] = useState("");
+  const selectedTargetOption = availableTargets.find(
+    (item) => item.value === target
+  );
+  const isRegression =
+    selectedTargetOption?.task_type === "regression";
 
   async function loadAvailableTargets() {
     if (!activeDataset) {
@@ -249,7 +254,9 @@ function MachineLearningTab({ activeDataset }) {
 
                   <span>
                     {" "}
-                    ({targetOption.num_classes} classes)
+                    {targetOption.task_type === "regression"
+                      ? `(${targetOption.num_samples} samples)`
+                      : `(${targetOption.num_classes} classes)`}
                   </span>
                 </label>
               ))}
@@ -328,10 +335,25 @@ function MachineLearningTab({ activeDataset }) {
               value={algorithm}
               onChange={(event) => setAlgorithm(event.target.value)}
             >
-              <option value="random_forest">Random Forest</option>
-              <option value="ridge">Ridge Classifier</option>
-              <option value="logistic_regression">Logistic Regression</option>
-              <option value="linear_svm">Linear SVM</option>
+              <option value="random_forest">
+                Random Forest
+              </option>
+
+              <option value="ridge">
+                {isRegression ? "Ridge Regression" : "Ridge Classifier"}
+              </option>
+
+              {!isRegression && (
+                <>
+                  <option value="logistic_regression">
+                    Logistic Regression
+                  </option>
+
+                  <option value="linear_svm">
+                    Linear SVM
+                  </option>
+                </>
+              )}
             </select>
           </label>
         </section>
@@ -347,17 +369,31 @@ function MachineLearningTab({ activeDataset }) {
               value={cvStrategy}
               onChange={(event) => setCvStrategy(event.target.value)}
             >
-              <option value="stratified">
-                Stratified K-Fold
-              </option>
+              {isRegression ? (
+                <>
+                  <option value="kfold">
+                    K-Fold Regression
+                  </option>
 
-              <option value="group_compound">
-                Group by compound
-              </option>
+                  <option value="competition_fold">
+                    GDPa1 Competition 5-Fold
+                  </option>
+                </>
+              ) : (
+                <>
+                  <option value="stratified">
+                    Stratified K-Fold
+                  </option>
 
-              <option value="group_well">
-                Well-aware Stratified Group K-Fold
-              </option>
+                  <option value="group_compound">
+                    Group by compound
+                  </option>
+
+                  <option value="group_well">
+                    Well-aware Stratified Group K-Fold
+                  </option>
+                </>
+              )}
             </select>
           </label>
 
@@ -450,9 +486,9 @@ function MachineLearningTab({ activeDataset }) {
                 <th>Target</th>
                 <th>Algorithm</th>
                 <th>CV</th>
-                <th>Accuracy</th>
-                <th>Macro F1</th>
-                <th>Weighted F1</th>
+                <th>Primary Metric</th>
+                <th>Metric 2</th>
+                <th>Metric 3</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -514,21 +550,69 @@ function MachineLearningTab({ activeDataset }) {
                     {run.cv_strategy}
                   </td>
 
-                  <td>
-                    {(run.accuracy * 100).toFixed(1)}%
-                  </td>
+                  {run.task_type === "regression" ? (
+                    <>
+                      <td>
+                        Spearman {run.spearman !== null
+                          ? run.spearman.toFixed(3)
+                          : "—"}
+                      </td>
 
-                  <td>
-                    {run.macro_f1 !== null
-                      ? run.macro_f1.toFixed(3)
-                      : "—"}
-                  </td>
+                      <td>
+                        MAE {run.mae !== null
+                          ? run.mae.toFixed(3)
+                          : "—"}
+                      </td>
 
-                  <td>
-                    {run.weighted_f1 !== null
-                      ? run.weighted_f1.toFixed(3)
-                      : "—"}
-                  </td>
+                      <td>
+                        R² {run.r2 !== null
+                          ? run.r2.toFixed(3)
+                          : "—"}
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                     {run.task_type === "regression" ? (
+                      <>
+                        <td>
+                          Spearman {run.spearman !== null
+                            ? run.spearman.toFixed(3)
+                            : "—"}
+                        </td>
+
+                        <td>
+                          MAE {run.mae !== null
+                            ? run.mae.toFixed(3)
+                            : "—"}
+                        </td>
+
+                        <td>
+                          R² {run.r2 !== null
+                            ? run.r2.toFixed(3)
+                            : "—"}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>
+                          {(run.accuracy * 100).toFixed(1)}%
+                        </td>
+
+                        <td>
+                          {run.macro_f1 !== null
+                            ? run.macro_f1.toFixed(3)
+                            : "—"}
+                        </td>
+
+                        <td>
+                          {run.weighted_f1 !== null
+                            ? run.weighted_f1.toFixed(3)
+                            : "—"}
+                        </td>
+                      </>
+                    )}
+                    </>
+                  )}
 
                   <td>
                     <Button
@@ -596,9 +680,9 @@ function MachineLearningTab({ activeDataset }) {
                 <th>CV</th>
                 <th>Samples</th>
                 <th>Features</th>
-                <th>Accuracy</th>
-                <th>Macro F1</th>
-                <th>Weighted F1</th>
+                <th>Primary Metric</th>
+                <th>Metric 2</th>
+                <th>Metric 3</th>
               </tr>
             </thead>
 
@@ -658,7 +742,8 @@ function MachineLearningTab({ activeDataset }) {
         </section>
       )}
 
-      {trainingResult && (
+      {trainingResult &&
+        trainingResult.task_type !== "regression" && (
         <section className="ml-results-card">
           <h4>Cross-Validation Results</h4>
 
@@ -998,6 +1083,65 @@ function MachineLearningTab({ activeDataset }) {
                   <td>{feature.importance.toFixed(4)}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+      {trainingResult?.task_type === "regression" && (
+        <section className="ml-results-card">
+          <h4>Cross-Validation Results</h4>
+
+          <div className="ml-results-grid">
+            <div>
+              <span>Feature Set</span>
+              <strong>{trainingResult.feature_set_name}</strong>
+            </div>
+
+            <div>
+              <span>Samples</span>
+              <strong>{trainingResult.num_samples}</strong>
+            </div>
+
+            <div>
+              <span>Features</span>
+              <strong>{trainingResult.num_features}</strong>
+            </div>
+
+            <div>
+              <span>Spearman ρ</span>
+              <strong>{trainingResult.spearman.toFixed(3)}</strong>
+            </div>
+
+            <div>
+              <span>MAE</span>
+              <strong>{trainingResult.mae.toFixed(3)}</strong>
+            </div>
+
+            <div>
+              <span>R²</span>
+              <strong>{trainingResult.r2.toFixed(3)}</strong>
+            </div>
+          </div>
+
+          <h5>Top Features</h5>
+
+          <table className="ml-results-table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>Importance</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {trainingResult.top_features.slice(0, 10).map(
+                (feature) => (
+                  <tr key={feature.feature}>
+                    <td>{feature.feature}</td>
+                    <td>{feature.importance.toFixed(4)}</td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         </section>
